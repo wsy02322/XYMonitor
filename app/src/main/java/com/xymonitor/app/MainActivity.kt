@@ -98,12 +98,15 @@ class MainActivity : AppCompatActivity() {
         intervalBInput.setOnFocusChangeListener { _, hasFocus -> if (!hasFocus) persistSettings() }
         findViewById<Button>(R.id.battery).setOnClickListener { openBatterySettings() }
         findViewById<Button>(R.id.fullscreen).setOnClickListener { openFullScreenSettings() }
+        statusView.setOnClickListener { AlertHaptic.stop(this) }
         AlertChannels.sync(this, prefs.newItemSoundUri)
         render()
     }
 
     override fun onStart() {
         super.onStart()
+        AppForeground.monitorVisible = true
+        AlertHaptic.stop(this)
         val filter = IntentFilter(MonitorService.ACTION_STATUS)
         if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(statusReceiver, filter, RECEIVER_NOT_EXPORTED)
@@ -114,6 +117,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onStop() {
+        AppForeground.monitorVisible = false
         persistSettings()
         unregisterReceiver(statusReceiver)
         super.onStop()

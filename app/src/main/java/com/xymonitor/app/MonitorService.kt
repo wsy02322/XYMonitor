@@ -59,6 +59,7 @@ class MonitorService : Service() {
         worker?.interrupt()
         worker = null
         releaseInspectLock()
+        AlertHaptic.stop(this)
         super.onDestroy()
     }
 
@@ -110,7 +111,7 @@ class MonitorService : Service() {
                     else -> "第一件未变 ${outcome.firstId}"
                 }
                 if (outcome.changed) {
-                    postChangeNotification(outcome.firstId)
+                    alertChange(outcome.firstId)
                 }
             } else {
                 prefs.lastError = outcome.error.orEmpty()
@@ -159,6 +160,7 @@ class MonitorService : Service() {
             title = "巡检失败",
             text = text,
             requestCode = 2,
+            silent = false,
         )
         try {
             startActivity(alertIntent("巡检失败", text))
@@ -166,15 +168,26 @@ class MonitorService : Service() {
         }
     }
 
-    private fun postChangeNotification(itemId: String) {
+    private fun alertChange(itemId: String) {
+        AlertHaptic.stop(this)
+        AlertHaptic.start(this)
         AlertChannels.sync(this, prefs.newItemSoundUri)
+        val visible = AppForeground.monitorVisible
         postAlertNotification(
             id = CHANGE_NOTIFICATION_ID,
             channelId = AlertChannels.alertChannelId(prefs.newItemSoundUri),
             title = "第一件变化",
             text = itemId,
             requestCode = 3,
+            silent = visible,
         )
+        if (visible) {
+            sounds.playNewItem(this, prefs.newItemSoundUri)
+            try {
+                startActivity(alertIntent("第一件变化", itemId))
+            } catch (_: Exception) {
+            }
+        }
     }
 
     private fun alertIntent(title: String, text: String): Intent {
@@ -190,8 +203,15 @@ class MonitorService : Service() {
         title: String,
         text: String,
         requestCode: Int,
+        silent: Boolean,
     ) {
         val pending = activityPending(requestCode, alertIntent(title, text))
+        val ack = PendingIntent.getBroadcast(
+            this,
+            requestCode + 100,
+            Intent(this, AlertAckReceiver::class.java).setAction(ACTION_ACK),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
         val builder = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.drawable.ic_notify)
             .setContentTitle(title)
@@ -202,7 +222,11 @@ class MonitorService : Service() {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pending)
-        if (AlertChannels.canUseFullScreen(this)) {
+            .setDeleteIntent(ack)
+        if (silent) {
+            builder.setSilent(true)
+        }
+        if (!silent && AlertChannels.canUseFullScreen(this)) {
             builder.setFullScreenIntent(pending, true)
         }
         getSystemService(NotificationManager::class.java).notify(id, builder.build())
@@ -261,6 +285,7 @@ class MonitorService : Service() {
         worker?.interrupt()
         worker = null
         releaseInspectLock()
+        AlertHaptic.stop(this)
         sendBroadcast(Intent(ACTION_STATUS).setPackage(packageName))
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -269,6 +294,7 @@ class MonitorService : Service() {
     companion object {
         const val ACTION_STATUS = "com.xymonitor.app.STATUS"
         const val ACTION_STOP = "com.xymonitor.app.STOP"
+        const val ACTION_ACK = "com.xymonitor.app.ACK"
         const val EXTRA_USER_ID = "user_id"
         private const val NOTIFICATION_ID = 1
         private const val ERROR_NOTIFICATION_ID = 2
@@ -282,6 +308,7 @@ class MonitorService : Service() {
         }
 
         fun stop(context: Context) {
+            AlertHaptic.stop(context)
             Prefs(context).apply {
                 running = false
                 lastStatus = "已停止"

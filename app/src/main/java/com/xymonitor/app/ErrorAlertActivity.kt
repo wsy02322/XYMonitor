@@ -26,8 +26,14 @@ class ErrorAlertActivity : AppCompatActivity() {
             .setTitle(title)
             .setMessage(message)
             .setCancelable(true)
-            .setPositiveButton("确定") { _, _ -> finish() }
-            .setOnDismissListener { if (!isFinishing) finish() }
+            .setPositiveButton("确定") { _, _ ->
+                AlertHaptic.stop(this)
+                finish()
+            }
+            .setOnDismissListener {
+                AlertHaptic.stop(this)
+                if (!isFinishing) finish()
+            }
             .show()
     }
 

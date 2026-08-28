@@ -24,5 +24,5 @@
     <string name="interval_a_hint">最短秒数</string>
     <string name="interval_b_hint">最长秒数</string>
     <string name="interval_hint">每次在 A～B 之间按毫秒随机等待，避免固定节奏被识别。过短更容易触发风控，建议 ≥ 60 秒，系统下限 30 秒。</string>
-    <string name="tips">忽略置顶，只看普通列表第一件。第一次成功只记下该 item_id，不响铃。之后第一件 ID 变了会发锁屏通知（用你选的提示音）。熄屏提醒请打开通知、忽略电池优化，并允许锁屏显示。全屏亮屏为可选项，系统不一定批准。</string>
+    <string name="tips">第一件 ID 变了会循环震动，直到你点通知、点弹窗确定、点状态栏或回到本页。停在本页时还会播一遍提示音。熄屏请打开通知并忽略电池优化。</string>
 </resources>
