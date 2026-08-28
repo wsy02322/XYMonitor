@@ -106,7 +106,6 @@ class MainActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         AppForeground.monitorVisible = true
-        AlertHaptic.stop(this)
         val filter = IntentFilter(MonitorService.ACTION_STATUS)
         if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(statusReceiver, filter, RECEIVER_NOT_EXPORTED)

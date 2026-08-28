@@ -11,7 +11,7 @@ import android.os.Build
 object AlertChannels {
     const val RUNNING = "monitor"
     const val ERROR = "monitor_error"
-    const val ALERT_PREFIX = "monitor_alert_"
+    const val ALERT_PREFIX = "monitor_alarm_"
 
     fun alertChannelId(soundUri: String): String {
         val key = if (soundUri.isBlank()) "default" else Integer.toHexString(soundUri.hashCode())
@@ -30,7 +30,9 @@ object AlertChannels {
         ensureError(context, manager)
         val id = alertChannelId(soundUri)
         manager.notificationChannels
-            .filter { it.id.startsWith(ALERT_PREFIX) && it.id != id }
+            .filter {
+                (it.id.startsWith(ALERT_PREFIX) || it.id.startsWith("monitor_alert_")) && it.id != id
+            }
             .forEach { manager.deleteNotificationChannel(it.id) }
         if (manager.getNotificationChannel(id) == null) {
             val channel = NotificationChannel(
@@ -56,7 +58,7 @@ object AlertChannels {
 
     private fun notificationAudio(): AudioAttributes {
         return AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+            .setUsage(AudioAttributes.USAGE_ALARM)
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
             .build()
     }

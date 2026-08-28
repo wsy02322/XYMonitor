@@ -23,6 +23,7 @@ class MonitorService : Service() {
     private val sounds = SoundPlayer()
     private var worker: Thread? = null
     private var inspectLock: PowerManager.WakeLock? = null
+    private var runLock: PowerManager.WakeLock? = null
     @Volatile private var running = false
     @Volatile private var userId: String = ""
 
@@ -49,6 +50,7 @@ class MonitorService : Service() {
         prefs.resetFirstIdIfUserChanged(nextUserId)
         prefs.running = true
         AlertChannels.sync(this, prefs.newItemSoundUri)
+        acquireRunLock()
         startInForeground()
         startLoop(nextUserId)
         return START_STICKY
@@ -59,6 +61,7 @@ class MonitorService : Service() {
         worker?.interrupt()
         worker = null
         releaseInspectLock()
+        releaseRunLock()
         AlertHaptic.stop(this)
         super.onDestroy()
     }
@@ -149,6 +152,30 @@ class MonitorService : Service() {
         }
     }
 
+    private fun acquireRunLock() {
+        val pm = getSystemService(PowerManager::class.java)
+        val lock = runLock ?: pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "xymonitor:run").also {
+            it.setReferenceCounted(false)
+            runLock = it
+        }
+        if (!lock.isHeld) {
+            try {
+                lock.acquire(12 * 60 * 60 * 1000L)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun releaseRunLock() {
+        val lock = runLock ?: return
+        if (lock.isHeld) {
+            try {
+                lock.release()
+            } catch (_: Exception) {
+            }
+        }
+    }
+
     private fun alertError(message: String) {
         if (prefs.errorSound) {
             sounds.playBeep()
@@ -169,20 +196,18 @@ class MonitorService : Service() {
     }
 
     private fun alertChange(itemId: String) {
-        AlertHaptic.stop(this)
         AlertHaptic.start(this)
         AlertChannels.sync(this, prefs.newItemSoundUri)
-        val visible = AppForeground.monitorVisible
+        sounds.playNewItem(this, prefs.newItemSoundUri)
         postAlertNotification(
             id = CHANGE_NOTIFICATION_ID,
             channelId = AlertChannels.alertChannelId(prefs.newItemSoundUri),
             title = "第一件变化",
             text = itemId,
             requestCode = 3,
-            silent = visible,
+            silent = false,
         )
-        if (visible) {
-            sounds.playNewItem(this, prefs.newItemSoundUri)
+        if (AppForeground.monitorVisible) {
             try {
                 startActivity(alertIntent("第一件变化", itemId))
             } catch (_: Exception) {
@@ -285,6 +310,7 @@ class MonitorService : Service() {
         worker?.interrupt()
         worker = null
         releaseInspectLock()
+        releaseRunLock()
         AlertHaptic.stop(this)
         sendBroadcast(Intent(ACTION_STATUS).setPackage(packageName))
         stopForeground(STOP_FOREGROUND_REMOVE)
