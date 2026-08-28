@@ -25,28 +25,17 @@
 
 ### 1. VPS 一键部署
 
-SSH 进机器后，在仓库目录执行：
+仓库已公开。用 **root** SSH 进 VPS，执行：
 
 ```bash
-sudo bash server/install.sh
+curl -fsSL https://raw.githubusercontent.com/wsy02322/XYMonitor/cursor/xianyu-monitor-5624/server/install.sh | bash
 ```
 
 会安装到 `/opt/xymonitor`、用 systemd 保活、生成密钥，最后打印要填进 App 的地址和密钥。再跑一次就是更新代码并重启。
 
-仓库还没拉到 VPS 时（需要这台机器能访问 GitHub）：
-
-```bash
-sudo apt-get update && sudo apt-get install -y git python3
-git clone https://github.com/wsy02322/XYMonitor.git
-cd XYMonitor && git checkout cursor/xianyu-monitor-5624
-sudo bash server/install.sh
-```
-
-私有仓库 clone 失败就先在能登录 GitHub 的环境把 `server/` 拷上去，再执行 `sudo bash server/install.sh`。
-
 云厂商安全组放行 TCP **8787**。看日志：`journalctl -u xymonitor -f`
 
-可选 Telegram：编辑 `/opt/xymonitor/env` 填 `TELEGRAM_BOT_TOKEN` 和 `TELEGRAM_CHAT_ID`，然后 `sudo systemctl restart xymonitor`。
+可选 Telegram：编辑 `/opt/xymonitor/env` 填 `TELEGRAM_BOT_TOKEN` 和 `TELEGRAM_CHAT_ID`，然后 `systemctl restart xymonitor`。
 
 ### 2. App
 

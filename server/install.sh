@@ -1,28 +1,33 @@
 #!/usr/bin/env bash
-# XYMonitor VPS 一键安装。在仓库里执行：
-#   sudo bash server/install.sh
+# 一键部署（VPS 用 root）：
+#   curl -fsSL https://raw.githubusercontent.com/wsy02322/XYMonitor/cursor/xianyu-monitor-5624/server/install.sh | bash
 set -euo pipefail
 
 PORT="${XY_PORT:-8787}"
 DEST="${XY_HOME:-/opt/xymonitor}"
-SRC="$(cd "$(dirname "$0")" && pwd)"
+REPO="${XY_REPO:-https://github.com/wsy02322/XYMonitor.git}"
+REF="${XY_REF:-cursor/xianyu-monitor-5624}"
 SERVICE="/etc/systemd/system/xymonitor.service"
 
 if [[ "$(id -u)" -ne 0 ]]; then
-  echo "请用 root 或 sudo 执行：sudo bash server/install.sh" >&2
+  echo "请用 root 执行" >&2
   exit 1
 fi
 
-if ! command -v python3 >/dev/null 2>&1; then
+need_pkgs=()
+command -v python3 >/dev/null 2>&1 || need_pkgs+=(python3)
+command -v git >/dev/null 2>&1 || need_pkgs+=(git)
+command -v curl >/dev/null 2>&1 || need_pkgs+=(curl)
+if [[ "${#need_pkgs[@]}" -gt 0 ]]; then
   if command -v apt-get >/dev/null 2>&1; then
     apt-get update -y
-    apt-get install -y python3
+    apt-get install -y "${need_pkgs[@]}"
   elif command -v dnf >/dev/null 2>&1; then
-    dnf install -y python3
+    dnf install -y "${need_pkgs[@]}"
   elif command -v yum >/dev/null 2>&1; then
-    yum install -y python3
+    yum install -y "${need_pkgs[@]}"
   else
-    echo "请先安装 python3（需要 3.10+）" >&2
+    echo "请先安装: ${need_pkgs[*]}" >&2
     exit 1
   fi
 fi
@@ -32,6 +37,17 @@ PY_OK="$(python3 -c 'import sys; print(int(sys.version_info >= (3, 10)))')"
 if [[ "$PY_OK" != "1" ]]; then
   echo "当前 python3 是 ${PY_VER}，需要 3.10+" >&2
   exit 1
+fi
+
+SCRIPT="${BASH_SOURCE[0]:-$0}"
+SRC=""
+if [[ -n "$SCRIPT" && "$SCRIPT" != "bash" && "$SCRIPT" != "-bash" && -f "$(dirname "$SCRIPT")/app.py" ]]; then
+  SRC="$(cd "$(dirname "$SCRIPT")" && pwd)"
+else
+  STAGING="$(mktemp -d /tmp/xymonitor-src.XXXXXX)"
+  git clone --depth 1 --branch "$REF" "$REPO" "$STAGING"
+  SRC="$STAGING/server"
+  trap 'rm -rf "$STAGING"' EXIT
 fi
 
 mkdir -p "$DEST/data"
@@ -44,7 +60,8 @@ if [[ ! -f "$DEST/.token" ]]; then
   chmod 600 "$DEST/.token"
 fi
 
-cat > "$DEST/env" <<EOF
+if [[ ! -f "$DEST/env" ]]; then
+  cat > "$DEST/env" <<EOF
 XY_HOST=0.0.0.0
 XY_PORT=$PORT
 XY_TOKEN_FILE=$DEST/.token
@@ -52,7 +69,8 @@ XY_STATE_FILE=$DEST/data/state.json
 # TELEGRAM_BOT_TOKEN=
 # TELEGRAM_CHAT_ID=
 EOF
-chmod 600 "$DEST/env"
+  chmod 600 "$DEST/env"
+fi
 
 cat > "$SERVICE" <<EOF
 [Unit]
