@@ -25,6 +25,8 @@ import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
     private lateinit var prefs: Prefs
+    private lateinit var vpsUrlInput: EditText
+    private lateinit var vpsTokenInput: EditText
     private lateinit var userIdInput: EditText
     private lateinit var intervalAInput: EditText
     private lateinit var intervalBInput: EditText
@@ -66,6 +68,8 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         prefs = Prefs(this)
+        vpsUrlInput = findViewById(R.id.vpsUrl)
+        vpsTokenInput = findViewById(R.id.vpsToken)
         userIdInput = findViewById(R.id.userId)
         intervalAInput = findViewById(R.id.intervalA)
         intervalBInput = findViewById(R.id.intervalB)
@@ -75,6 +79,8 @@ class MainActivity : AppCompatActivity() {
         stopButton = findViewById(R.id.stop)
         fullscreenStatus = findViewById(R.id.fullscreenStatus)
         debugLogView = findViewById(R.id.debugLog)
+        vpsUrlInput.setText(prefs.vpsUrl)
+        vpsTokenInput.setText(prefs.vpsToken)
         userIdInput.setText(prefs.userId)
         intervalAInput.setText(prefs.intervalA.toString())
         intervalBInput.setText(prefs.intervalB.toString())
@@ -145,7 +151,19 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "请填写数字 userId", Toast.LENGTH_SHORT).show()
             return
         }
+        val vpsUrl = vpsUrlInput.text.toString().trim()
+        if (!vpsUrl.startsWith("http://") && !vpsUrl.startsWith("https://")) {
+            Toast.makeText(this, "请填写服务器地址，以 http:// 或 https:// 开头", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val vpsToken = vpsTokenInput.text.toString().trim()
+        if (vpsToken.isEmpty()) {
+            Toast.makeText(this, "请填写服务器密钥", Toast.LENGTH_SHORT).show()
+            return
+        }
         prefs.userId = userId
+        prefs.vpsUrl = vpsUrl
+        prefs.vpsToken = vpsToken
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
             != PackageManager.PERMISSION_GRANTED
@@ -171,6 +189,8 @@ class MainActivity : AppCompatActivity() {
         val b = intervalBInput.text.toString().trim().toIntOrNull() ?: return false
         prefs.intervalA = a
         prefs.intervalB = b
+        prefs.vpsUrl = vpsUrlInput.text.toString().trim()
+        prefs.vpsToken = vpsTokenInput.text.toString().trim()
         if (!intervalAInput.hasFocus()) intervalAInput.setText(prefs.intervalA.toString())
         if (!intervalBInput.hasFocus()) intervalBInput.setText(prefs.intervalB.toString())
         return true
@@ -282,6 +302,8 @@ class MainActivity : AppCompatActivity() {
         val running = prefs.running
         startButton.isEnabled = !running
         stopButton.isEnabled = running
+        vpsUrlInput.isEnabled = !running
+        vpsTokenInput.isEnabled = !running
         userIdInput.isEnabled = !running
         soundLabel.text = getString(R.string.sound_value, soundName())
         fullscreenStatus.text = if (AlertChannels.canUseFullScreen(this)) {
@@ -304,7 +326,7 @@ class MainActivity : AppCompatActivity() {
         }
         val error = prefs.lastError.ifBlank { "无" }
         statusView.text = buildString {
-            append(if (running) "状态：运行中（闹钟唤醒，A～B 秒随机）" else "状态：已停止")
+            append(if (running) "状态：运行中（服务器打闲鱼，手机闹钟问服务器）" else "状态：已停止")
             append('\n')
             append(wait)
             append('\n')

@@ -14,3 +14,9 @@ captures/
 *.dex
 *.class
 .kotlin/
+__pycache__/
+*.pyc
+server/data/
+server/.token
+venv/
+.venv/

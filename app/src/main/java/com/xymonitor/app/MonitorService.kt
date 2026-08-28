@@ -50,6 +50,7 @@ class MonitorService : Service() {
             ACTION_KEEPALIVE -> {}
             ACTION_START -> {
                 prefs.clearSessionTiming()
+                prefs.syncServer = true
                 DebugLog.i(
                     "服务启动 userId=$nextUserId 前台=${yesNo(AppForeground.monitorVisible)} " +
                         "白名单=${yesNo(Health.batteryIgnored(this))} " +
@@ -172,6 +173,7 @@ class MonitorService : Service() {
                 clearSessionTiming()
             }
             InspectScheduler.cancel(context)
+            Thread({ InspectRunner.stopServer(context) }, "xy-stop-vps").start()
             val intent = Intent(context, MonitorService::class.java).setAction(ACTION_STOP)
             try {
                 context.startService(intent)

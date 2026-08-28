@@ -7,6 +7,14 @@ class Prefs(context: Context) {
     private val sp: SharedPreferences =
         context.applicationContext.getSharedPreferences("xymonitor", Context.MODE_PRIVATE)
 
+    var vpsUrl: String
+        get() = sp.getString(KEY_VPS_URL, "").orEmpty()
+        set(value) = sp.edit().putString(KEY_VPS_URL, value.trim()).apply()
+
+    var vpsToken: String
+        get() = sp.getString(KEY_VPS_TOKEN, "").orEmpty()
+        set(value) = sp.edit().putString(KEY_VPS_TOKEN, value.trim()).apply()
+
     var userId: String
         get() = sp.getString(KEY_USER_ID, "").orEmpty()
         set(value) = sp.edit().putString(KEY_USER_ID, value.trim()).apply()
@@ -59,6 +67,10 @@ class Prefs(context: Context) {
         get() = sp.getLong(KEY_NEXT_AT, 0L)
         set(value) = sp.edit().putLong(KEY_NEXT_AT, value).apply()
 
+    var syncServer: Boolean
+        get() = sp.getBoolean(KEY_SYNC_SERVER, false)
+        set(value) = sp.edit().putBoolean(KEY_SYNC_SERVER, value).apply()
+
     fun resetFirstIdIfUserChanged(userId: String) {
         val previous = sp.getString(KEY_KNOWN_USER, "")
         if (previous != userId) {
@@ -76,6 +88,8 @@ class Prefs(context: Context) {
 
     companion object {
         private const val KEY_USER_ID = "user_id"
+        private const val KEY_VPS_URL = "vps_url"
+        private const val KEY_VPS_TOKEN = "vps_token"
         private const val KEY_RUNNING = "running"
         private const val KEY_LAST_CHECK = "last_check"
         private const val KEY_LAST_STATUS = "last_status"
@@ -89,5 +103,6 @@ class Prefs(context: Context) {
         private const val KEY_PLANNED_WAIT = "planned_wait"
         private const val KEY_ACTUAL_GAP = "actual_gap"
         private const val KEY_NEXT_AT = "next_inspect_at"
+        private const val KEY_SYNC_SERVER = "sync_server"
     }
 }

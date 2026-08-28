@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">闲鱼上新监控</string>
-    <string name="subtitle">按随机间隔检查卖家主页列表第一件</string>
+    <string name="subtitle">服务器打闲鱼，手机只问服务器是否上新</string>
+    <string name="vps_url_label">服务器地址</string>
+    <string name="vps_url_hint">例如 http://1.2.3.4:8787</string>
+    <string name="vps_token_label">服务器密钥</string>
+    <string name="vps_token_hint">和 VPS 上的 XY_TOKEN 相同</string>
     <string name="user_id_label">卖家 userId</string>
     <string name="user_id_hint">例如 1666703902</string>
     <string name="start">开始监控</string>
@@ -22,11 +26,11 @@
     <string name="sound_default">默认</string>
     <string name="sound_custom">已选择</string>
     <string name="error_hint">巡检失败只循环震动并出通知，不放提示音。第一件变化才会响你选的音乐。</string>
-    <string name="interval_label">巡检间隔（秒）最短 A ～ 最长 B</string>
+    <string name="interval_label">服务器巡检间隔（秒）最短 A ～ 最长 B</string>
     <string name="interval_a_hint">最短秒数</string>
     <string name="interval_b_hint">最长秒数</string>
-    <string name="interval_hint">每次在 A～B 之间按毫秒随机等待，避免固定节奏被识别。过短更容易触发风控，建议 ≥ 60 秒，系统下限 30 秒。</string>
+    <string name="interval_hint">这是服务器打闲鱼的间隔，每次在 A～B 之间按毫秒随机。手机用闹钟约 30～50 秒问一次服务器有没有待提醒。过短更容易触发风控，建议 ≥ 60 秒，系统下限 30 秒。</string>
     <string name="probe">试一次提醒（不改已记 ID）</string>
     <string name="copy_log">复制调试日志</string>
-    <string name="tips">第一件变化会循环震动并放提示音；巡检失败只震动。点通知、弹窗确定或状态栏可停震。系统状态栏可能显示下次巡检为闹钟。下方是调试日志；先点「试一次提醒」确认上新的震动和声音。</string>
+    <string name="tips">闲鱼由服务器拉取。手机闹钟问服务器，上新仍走本机铃声和循环震动。点通知、弹窗确定或状态栏可停震。厂商推送和邀请码以后再做。</string>
 </resources>
