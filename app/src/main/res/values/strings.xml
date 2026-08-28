@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">闲鱼上新监控</string>
+    <string name="subtitle">每 3 分钟检查指定卖家主页第一页</string>
+    <string name="user_id_label">卖家 userId</string>
+    <string name="user_id_hint">例如 1666703902</string>
+    <string name="start">开始监控</string>
+    <string name="stop">停止</string>
+    <string name="battery">忽略电池优化</string>
+    <string name="notify_channel">监控运行</string>
+    <string name="tips">首次成功只记当前商品，不响铃。之后出现新 item_id 播放提示音，巡检失败播放另一提示音。请允许通知，并关闭对该应用的电池优化。</string>
+</resources>
