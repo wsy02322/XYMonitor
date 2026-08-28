@@ -23,22 +23,30 @@
 
 ## 怎么跑
 
-### 1. VPS
+### 1. VPS 一键部署
 
-Python 3.10+，标准库，无额外依赖。
+SSH 进机器后，在仓库目录执行：
 
 ```bash
-cd server
-export XY_TOKEN='自己设一个密钥'
-# 可选：Telegram 备用
-# export TELEGRAM_BOT_TOKEN=...
-# export TELEGRAM_CHAT_ID=...
-python3 app.py
+sudo bash server/install.sh
 ```
 
-默认 `http://0.0.0.0:8787`。没设 `XY_TOKEN` 时会生成并写入 `server/.token`。
+会安装到 `/opt/xymonitor`、用 systemd 保活、生成密钥，最后打印要填进 App 的地址和密钥。再跑一次就是更新代码并重启。
 
-防火墙放行 8787。安全组只给自己手机 IP 也能用。
+仓库还没拉到 VPS 时（需要这台机器能访问 GitHub）：
+
+```bash
+sudo apt-get update && sudo apt-get install -y git python3
+git clone https://github.com/wsy02322/XYMonitor.git
+cd XYMonitor && git checkout cursor/xianyu-monitor-5624
+sudo bash server/install.sh
+```
+
+私有仓库 clone 失败就先在能登录 GitHub 的环境把 `server/` 拷上去，再执行 `sudo bash server/install.sh`。
+
+云厂商安全组放行 TCP **8787**。看日志：`journalctl -u xymonitor -f`
+
+可选 Telegram：编辑 `/opt/xymonitor/env` 填 `TELEGRAM_BOT_TOKEN` 和 `TELEGRAM_CHAT_ID`，然后 `sudo systemctl restart xymonitor`。
 
 ### 2. App
 
