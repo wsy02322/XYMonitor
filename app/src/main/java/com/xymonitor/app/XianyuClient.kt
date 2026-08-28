@@ -5,16 +5,19 @@ import java.io.BufferedReader
 import java.io.InputStream
 import java.net.ConnectException
 import java.net.HttpURLConnection
+import java.net.SocketException
 import java.net.SocketTimeoutException
 import java.net.URL
 import java.net.URLEncoder
 import java.net.UnknownHostException
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicReference
 
 class XianyuClient(
     private val nowMs: () -> Long = { System.currentTimeMillis() },
 ) {
     private val cookies = ConcurrentHashMap<String, String>()
+    private val current = AtomicReference<HttpURLConnection?>()
 
     fun fetchFirstCardId(userId: String): String {
         return try {
@@ -23,6 +26,13 @@ class XianyuClient(
             if (e is InterruptedException || !isRetryable(e)) throw e
             DebugLog.i("巡检重试 原因=${e.message}")
             fetchOnce(userId)
+        }
+    }
+
+    fun abort() {
+        try {
+            current.getAndSet(null)?.disconnect()
+        } catch (_: Exception) {
         }
     }
 
@@ -85,6 +95,7 @@ class XianyuClient(
                 setRequestProperty("Cookie", cookieHeader)
             }
         }
+        current.set(conn)
         try {
             val body = "data=${enc(data)}"
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
@@ -103,6 +114,7 @@ class XianyuClient(
             }
             return text
         } finally {
+            current.compareAndSet(conn, null)
             conn.disconnect()
         }
     }
@@ -134,13 +146,17 @@ class XianyuClient(
     private fun enc(value: String): String = URLEncoder.encode(value, "UTF-8")
 
     companion object {
-        const val CONNECT_TIMEOUT_MS = 8_000
-        const val READ_TIMEOUT_MS = 8_000
-        const val INSPECT_LOCK_MS = 45_000L
+        const val CONNECT_TIMEOUT_MS = 5_000
+        const val READ_TIMEOUT_MS = 5_000
+        const val INSPECT_LOCK_MS = 20_000L
 
         fun isRetryable(error: Throwable): Boolean {
             if (error is InterruptedException) return false
-            if (error is ConnectException || error is SocketTimeoutException || error is UnknownHostException) {
+            if (error is ConnectException ||
+                error is SocketTimeoutException ||
+                error is UnknownHostException ||
+                error is SocketException
+            ) {
                 return true
             }
             val message = error.message.orEmpty()

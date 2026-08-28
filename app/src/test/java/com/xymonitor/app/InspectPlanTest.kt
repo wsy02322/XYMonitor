@@ -26,4 +26,11 @@ class InspectPlanTest {
         assertTrue(InspectPlan.overdue(1_020_000L, 1_000_000L))
         assertFalse(InspectPlan.overdue(1_000_000L, 0L))
     }
+
+    @Test
+    fun watchdogIsShortAndAfterConnectTimeout() {
+        assertEquals(12_000L, InspectPlan.WATCHDOG_MS)
+        assertTrue(InspectPlan.WATCHDOG_MS > XianyuClient.CONNECT_TIMEOUT_MS)
+        assertTrue(InspectPlan.WATCHDOG_MS < 30_000L)
+    }
 }
