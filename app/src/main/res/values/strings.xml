@@ -1,12 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">闲鱼上新监控</string>
-    <string name="subtitle">每 3 分钟检查指定卖家主页第一页</string>
+    <string name="subtitle">按随机间隔检查指定卖家主页第一页</string>
     <string name="user_id_label">卖家 userId</string>
     <string name="user_id_hint">例如 1666703902</string>
     <string name="start">开始监控</string>
     <string name="stop">停止</string>
     <string name="battery">忽略电池优化</string>
     <string name="notify_channel">监控运行</string>
-    <string name="tips">首次成功只记当前商品，不响铃。之后出现新 item_id 播放提示音，巡检失败播放另一提示音。请允许通知，并关闭对该应用的电池优化。</string>
+    <string name="notify_error_channel">出错提醒</string>
+    <string name="pick_sound">选择上新提示音</string>
+    <string name="reset_sound">恢复默认</string>
+    <string name="sound_value">上新提示音：%1$s</string>
+    <string name="sound_default">默认</string>
+    <string name="sound_custom">已选择</string>
+    <string name="error_sound">出错时发声（滴一声）</string>
+    <string name="error_hint">出错始终发送通知并尝试弹窗；发声可关。</string>
+    <string name="interval_label">巡检间隔（秒）最短 A ～ 最长 B</string>
+    <string name="interval_a_hint">最短秒数</string>
+    <string name="interval_b_hint">最长秒数</string>
+    <string name="interval_hint">每次在 A～B 之间按毫秒随机等待，避免固定节奏被识别。过短更容易触发风控，建议 ≥ 60 秒，系统下限 30 秒。</string>
+    <string name="tips">首次成功只记当前商品，不响铃。之后出现新 item_id 播放你选择的提示音。请允许通知，并关闭对该应用的电池优化。</string>
 </resources>

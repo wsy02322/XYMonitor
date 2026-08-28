@@ -31,6 +31,7 @@ class MonitorService : Service() {
         if (intent?.action == ACTION_STOP) {
             prefs.running = false
             prefs.lastStatus = "已停止"
+            prefs.nextWaitMs = 0L
             shutdown()
             return START_NOT_STICKY
         }
@@ -69,8 +70,12 @@ class MonitorService : Service() {
             while (running) {
                 inspectOnce(nextUserId)
                 if (!running) break
+                val delay = Interval.nextDelayMs(prefs.intervalA, prefs.intervalB)
+                prefs.nextWaitMs = delay
+                notifyStatus()
+                sendBroadcast(Intent(ACTION_STATUS).setPackage(packageName))
                 try {
-                    Thread.sleep(INTERVAL_MS)
+                    Thread.sleep(delay)
                 } catch (_: InterruptedException) {
                     break
                 }
@@ -102,21 +107,37 @@ class MonitorService : Service() {
                 outcome.newIds.isNotEmpty() -> "发现 ${outcome.newIds.size} 件上新"
                 else -> "无上新，当前 ${outcome.itemIds.size} 件"
             }
+            cancelErrorNotification()
             if (outcome.newIds.isNotEmpty()) {
-                sounds.playNewItem()
+                sounds.playNewItem(prefs.newItemSoundUri)
             }
         } else {
             prefs.lastError = outcome.error.orEmpty()
             prefs.lastStatus = "巡检失败"
-            sounds.playFail()
+            alertError(outcome.error.orEmpty())
         }
         notifyStatus()
         sendBroadcast(Intent(ACTION_STATUS).setPackage(packageName))
     }
 
+    private fun alertError(message: String) {
+        if (prefs.errorSound) {
+            sounds.playBeep()
+        }
+        postErrorNotification(message)
+        try {
+            startActivity(
+                Intent(this, ErrorAlertActivity::class.java)
+                    .putExtra(ErrorAlertActivity.EXTRA_MESSAGE, message.ifBlank { "未知错误" })
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            )
+        } catch (_: Exception) {
+        }
+    }
+
     private fun startInForeground() {
-        ensureChannel()
-        val notification = buildNotification(prefs.lastStatus.ifBlank { "启动中" })
+        ensureChannels()
+        val notification = buildRunningNotification(prefs.lastStatus.ifBlank { "启动中" })
         if (Build.VERSION.SDK_INT >= 29) {
             ServiceCompat.startForeground(
                 this,
@@ -131,21 +152,21 @@ class MonitorService : Service() {
 
     private fun notifyStatus() {
         getSystemService(NotificationManager::class.java)
-            .notify(NOTIFICATION_ID, buildNotification(prefs.lastStatus))
+            .notify(NOTIFICATION_ID, buildRunningNotification(prefs.lastStatus))
     }
 
-    private fun buildNotification(status: String): Notification {
-        val open = PendingIntent.getActivity(
-            this,
-            0,
-            Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
+    private fun buildRunningNotification(status: String): Notification {
+        val open = activityPending(0, Intent(this, MainActivity::class.java))
         val time = if (prefs.lastCheckAt > 0) TIME_FMT.format(Date(prefs.lastCheckAt)) else "--:--"
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val wait = if (prefs.nextWaitMs > 0) {
+            " · 下次 ${Interval.formatSeconds(prefs.nextWaitMs)} 秒"
+        } else {
+            ""
+        }
+        return NotificationCompat.Builder(this, CHANNEL_RUNNING)
             .setSmallIcon(R.drawable.ic_notify)
             .setContentTitle(getString(R.string.app_name))
-            .setContentText("运行中 · $time · $status")
+            .setContentText("运行中 · $time · $status$wait")
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(open)
@@ -153,15 +174,52 @@ class MonitorService : Service() {
             .build()
     }
 
-    private fun ensureChannel() {
+    private fun postErrorNotification(message: String) {
+        ensureChannels()
+        val dialog = Intent(this, ErrorAlertActivity::class.java)
+            .putExtra(ErrorAlertActivity.EXTRA_MESSAGE, message.ifBlank { "未知错误" })
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        val notification = NotificationCompat.Builder(this, CHANNEL_ERROR)
+            .setSmallIcon(R.drawable.ic_notify)
+            .setContentTitle("巡检失败")
+            .setContentText(message.ifBlank { "未知错误" })
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message.ifBlank { "未知错误" }))
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(activityPending(2, dialog))
+            .build()
+        getSystemService(NotificationManager::class.java).notify(ERROR_NOTIFICATION_ID, notification)
+    }
+
+    private fun cancelErrorNotification() {
+        getSystemService(NotificationManager::class.java).cancel(ERROR_NOTIFICATION_ID)
+    }
+
+    private fun activityPending(requestCode: Int, intent: Intent): PendingIntent {
+        return PendingIntent.getActivity(
+            this,
+            requestCode,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
+    private fun ensureChannels() {
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
             NotificationChannel(
-                CHANNEL_ID,
+                CHANNEL_RUNNING,
                 getString(R.string.notify_channel),
                 NotificationManager.IMPORTANCE_LOW,
             ),
         )
+        val error = NotificationChannel(
+            CHANNEL_ERROR,
+            getString(R.string.notify_error_channel),
+            NotificationManager.IMPORTANCE_HIGH,
+        )
+        error.enableVibration(true)
+        manager.createNotificationChannel(error)
     }
 
     private fun shutdown() {
@@ -178,9 +236,10 @@ class MonitorService : Service() {
         const val ACTION_STATUS = "com.xymonitor.app.STATUS"
         const val ACTION_STOP = "com.xymonitor.app.STOP"
         const val EXTRA_USER_ID = "user_id"
-        const val INTERVAL_MS = 3 * 60 * 1000L
-        private const val CHANNEL_ID = "monitor"
+        private const val CHANNEL_RUNNING = "monitor"
+        private const val CHANNEL_ERROR = "monitor_error"
         private const val NOTIFICATION_ID = 1
+        private const val ERROR_NOTIFICATION_ID = 2
         private val TIME_FMT = SimpleDateFormat("HH:mm:ss", Locale.CHINA)
 
         fun start(context: Context, userId: String) {
@@ -193,6 +252,7 @@ class MonitorService : Service() {
             Prefs(context).apply {
                 running = false
                 lastStatus = "已停止"
+                nextWaitMs = 0L
             }
             val intent = Intent(context, MonitorService::class.java).setAction(ACTION_STOP)
             try {

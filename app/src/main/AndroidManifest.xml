@@ -26,6 +26,16 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ErrorAlertActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:showWhenLocked="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.XYMonitor.Dialog"
+            android:turnScreenOn="true" />
+
         <service
             android:name=".MonitorService"
             android:exported="false"
