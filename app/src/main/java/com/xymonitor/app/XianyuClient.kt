@@ -128,7 +128,7 @@ class XianyuClient(
     private fun openHttps(pathAndQuery: String): HttpsURLConnection {
         val host = HOST
         val net = via
-        val resolved = if (net != null) net.allByName(host) else InetAddress.getAllByName(host)
+        val resolved = if (net != null) net.getAllByName(host) else InetAddress.getAllByName(host)
         DebugLog.i("解析 $host ${Ipv4.describe(resolved)}${if (net != null) " 经流量" else ""}")
         val ipv4 = Ipv4.pick(resolved)
         val url = URL("https://${ipv4.hostAddress}$pathAndQuery")
