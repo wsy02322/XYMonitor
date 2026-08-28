@@ -6,6 +6,12 @@
 - 之后出现新 ID：播放提示音
 - 巡检失败：播放另一种提示音
 
+## 下载
+
+Debug APK：
+
+https://github.com/wsy02322/XYMonitor/raw/cursor/xianyu-monitor-5624/dist/xymonitor-debug.apk
+
 ## 使用
 
 1. 用 Android Studio 打开本仓库，或执行 `./gradlew assembleDebug`
