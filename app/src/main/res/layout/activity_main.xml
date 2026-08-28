@@ -217,6 +217,14 @@
             android:text="@string/battery" />
 
         <Button
+            android:id="@+id/exactAlarm"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:backgroundTint="@color/muted_btn"
+            android:text="@string/exact_alarm" />
+
+        <Button
             android:id="@+id/fullscreen"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

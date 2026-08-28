@@ -99,6 +99,7 @@ class MainActivity : AppCompatActivity() {
         intervalAInput.setOnFocusChangeListener { _, hasFocus -> if (!hasFocus) persistSettings() }
         intervalBInput.setOnFocusChangeListener { _, hasFocus -> if (!hasFocus) persistSettings() }
         findViewById<Button>(R.id.battery).setOnClickListener { openBatterySettings() }
+        findViewById<Button>(R.id.exactAlarm).setOnClickListener { openExactAlarmSettings() }
         findViewById<Button>(R.id.fullscreen).setOnClickListener { openFullScreenSettings() }
         findViewById<Button>(R.id.probe).setOnClickListener {
             DebugLog.init(this)
@@ -162,7 +163,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startMonitor() {
-        askIgnoreBatteryOnce()
+        if (!InspectScheduler.canExact(this)) {
+            askExactAlarmOnce()
+        } else {
+            askIgnoreBatteryOnce()
+        }
         MonitorService.start(this, userIdInput.text.toString().trim())
         render()
     }
@@ -209,6 +214,26 @@ class MainActivity : AppCompatActivity() {
                 ?: getString(R.string.sound_custom)
         } catch (_: Exception) {
             getString(R.string.sound_custom)
+        }
+    }
+
+    private fun askExactAlarmOnce() {
+        if (InspectScheduler.canExact(this)) return
+        openExactAlarmSettings()
+    }
+
+    private fun openExactAlarmSettings() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            Toast.makeText(this, getString(R.string.exact_alarm_on), Toast.LENGTH_SHORT).show()
+            return
+        }
+        try {
+            startActivity(
+                Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+                    .setData(Uri.parse("package:$packageName")),
+            )
+        } catch (_: Exception) {
+            Toast.makeText(this, "请在系统设置中允许精确闹钟", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -281,14 +306,15 @@ class MainActivity : AppCompatActivity() {
         } else {
             "—"
         }
-        val wait = if (running && prefs.nextWaitMs > 0) {
-            "下次约 ${Interval.formatSeconds(prefs.nextWaitMs)} 秒"
+        val remain = InspectPlan.remainingMs(System.currentTimeMillis(), prefs.nextInspectAt)
+        val wait = if (running && remain > 0) {
+            "下次约 ${Interval.formatSeconds(remain)} 秒"
         } else {
             "下次：—"
         }
         val error = prefs.lastError.ifBlank { "无" }
         statusView.text = buildString {
-            append(if (running) "状态：运行中（A～B 秒随机间隔）" else "状态：已停止")
+            append(if (running) "状态：运行中（闹钟唤醒，A～B 秒随机）" else "状态：已停止")
             append('\n')
             append(wait)
             append('\n')
@@ -301,6 +327,8 @@ class MainActivity : AppCompatActivity() {
             append("错误：$error")
             append('\n')
             append("电池优化：${if (Health.batteryIgnored(this@MainActivity)) "已忽略" else "未忽略（后台易被冻）"}")
+            append('\n')
+            append("精确闹钟：${if (Health.exactAlarmAllowed(this@MainActivity)) "已允许" else "未允许（后台不准时）"}")
             append('\n')
             append("通知权限：${if (Health.notificationsEnabled(this@MainActivity)) "已开" else "未开"}")
             if (prefs.lastActualGapMs > 0) {

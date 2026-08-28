@@ -101,4 +101,6 @@ object Health {
         if (plannedMs <= 0 || actualMs <= 0) return false
         return actualMs > plannedMs + 15_000L && actualMs > plannedMs * 3 / 2
     }
+
+    fun exactAlarmAllowed(context: Context): Boolean = InspectScheduler.canExact(context)
 }

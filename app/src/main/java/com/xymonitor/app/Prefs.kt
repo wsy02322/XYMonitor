@@ -59,6 +59,10 @@ class Prefs(context: Context) {
         get() = sp.getLong(KEY_ACTUAL_GAP, 0L)
         set(value) = sp.edit().putLong(KEY_ACTUAL_GAP, value).apply()
 
+    var nextInspectAt: Long
+        get() = sp.getLong(KEY_NEXT_AT, 0L)
+        set(value) = sp.edit().putLong(KEY_NEXT_AT, value).apply()
+
     fun resetFirstIdIfUserChanged(userId: String) {
         val previous = sp.getString(KEY_KNOWN_USER, "")
         if (previous != userId) {
@@ -84,5 +88,6 @@ class Prefs(context: Context) {
         private const val KEY_NEXT_WAIT = "next_wait"
         private const val KEY_PLANNED_WAIT = "planned_wait"
         private const val KEY_ACTUAL_GAP = "actual_gap"
+        private const val KEY_NEXT_AT = "next_inspect_at"
     }
 }

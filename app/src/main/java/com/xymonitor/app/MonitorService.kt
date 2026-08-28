@@ -21,19 +21,18 @@ class MonitorService : Service() {
     private val prefs by lazy { Prefs(this) }
     private val client = XianyuClient()
     private val sounds = SoundPlayer()
-    private var worker: Thread? = null
     private var inspectLock: PowerManager.WakeLock? = null
-    private var runLock: PowerManager.WakeLock? = null
-    @Volatile private var running = false
+    @Volatile private var inspecting = false
     @Volatile private var userId: String = ""
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        DebugLog.init(this)
         if (intent?.action == ACTION_STOP) {
             prefs.running = false
             prefs.lastStatus = "已停止"
-            prefs.nextWaitMs = 0L
+            InspectScheduler.cancel(this)
             shutdown()
             return START_NOT_STICKY
         }
@@ -49,54 +48,71 @@ class MonitorService : Service() {
         prefs.userId = nextUserId
         prefs.resetFirstIdIfUserChanged(nextUserId)
         prefs.running = true
-        DebugLog.init(this)
-        DebugLog.i(
-            "服务启动 userId=$nextUserId 前台=${if (AppForeground.monitorVisible) "是" else "否"} " +
-                "白名单=${if (Health.batteryIgnored(this)) "是" else "否"} " +
-                "通知=${if (Health.notificationsEnabled(this)) "是" else "否"}",
-        )
+        userId = nextUserId
         AlertChannels.sync(this, prefs.newItemSoundUri)
-        acquireRunLock()
-        DebugLog.i("WakeLock(run)=${if (runLock?.isHeld == true) "持有" else "失败"}")
         startInForeground()
-        startLoop(nextUserId)
+
+        when (intent?.action) {
+            ACTION_TICK -> startInspectThenSchedule()
+            ACTION_START -> {
+                DebugLog.i(
+                    "服务启动 userId=$nextUserId 前台=${yesNo(AppForeground.monitorVisible)} " +
+                        "白名单=${yesNo(Health.batteryIgnored(this))} " +
+                        "通知=${yesNo(Health.notificationsEnabled(this))} " +
+                        "精确闹钟=${yesNo(Health.exactAlarmAllowed(this))}",
+                )
+                startInspectThenSchedule()
+            }
+            else -> {
+                val nextAt = prefs.nextInspectAt
+                val now = System.currentTimeMillis()
+                if (nextAt > 0L && !InspectPlan.overdue(now, nextAt)) {
+                    val remain = InspectPlan.remainingMs(now, nextAt)
+                    DebugLog.i("服务被系统拉起，补约剩余 ${Interval.formatSeconds(remain)}s")
+                    InspectScheduler.scheduleAt(this, nextAt)
+                    notifyStatus()
+                    sendBroadcast(Intent(ACTION_STATUS).setPackage(packageName))
+                } else {
+                    DebugLog.i("服务被系统拉起，立即巡检")
+                    startInspectThenSchedule()
+                }
+            }
+        }
         return START_STICKY
     }
 
     override fun onDestroy() {
-        running = false
-        worker?.interrupt()
-        worker = null
+        inspecting = false
         releaseInspectLock()
-        releaseRunLock()
+        if (!prefs.running) {
+            InspectScheduler.cancel(this)
+        }
         AlertHaptic.stop(this, "服务销毁")
         super.onDestroy()
     }
 
-    private fun startLoop(nextUserId: String) {
-        if (worker?.isAlive == true && userId == nextUserId) return
-        running = false
-        worker?.interrupt()
-        userId = nextUserId
-        running = true
-        DebugLog.i("巡检循环开始")
-        worker = Thread({
-            while (running) {
-                inspectOnce(nextUserId)
-                if (!running) break
-                val delay = Interval.nextDelayMs(prefs.intervalA, prefs.intervalB)
-                prefs.nextWaitMs = delay
-                prefs.lastPlannedWaitMs = delay
-                DebugLog.i("等待下次 ${Interval.formatSeconds(delay)} 秒")
-                notifyStatus()
-                sendBroadcast(Intent(ACTION_STATUS).setPackage(packageName))
-                try {
-                    Thread.sleep(delay)
-                } catch (_: InterruptedException) {
-                    break
-                }
+    private fun startInspectThenSchedule() {
+        synchronized(this) {
+            if (inspecting) {
+                DebugLog.i("巡检进行中，忽略")
+                return
             }
-        }, "xy-monitor").also { it.start() }
+            inspecting = true
+        }
+        val currentUserId = userId
+        Thread({
+            try {
+                inspectOnce(currentUserId)
+                if (prefs.running) {
+                    val delay = Interval.nextDelayMs(prefs.intervalA, prefs.intervalB)
+                    InspectScheduler.schedule(this, delay)
+                    notifyStatus()
+                    sendBroadcast(Intent(ACTION_STATUS).setPackage(packageName))
+                }
+            } finally {
+                inspecting = false
+            }
+        }, "xy-inspect").start()
     }
 
     private fun inspectOnce(currentUserId: String) {
@@ -142,7 +158,7 @@ class MonitorService : Service() {
                     "巡检 $kind 第一件=${outcome.firstId} 上次=${previousId.ifBlank { "-" }} " +
                         "耗时=${Interval.formatSeconds(cost)}s 距上次=${Interval.formatSeconds(gap)}s " +
                         "计划=${Interval.formatSeconds(planned)}s" +
-                        if (frozen) " 线程可能被冻" else "",
+                        if (frozen) " 可能被冻" else "",
                 )
                 if (outcome.changed) {
                     ChangeAlert.fire(this, outcome.firstId, "上新")
@@ -176,30 +192,6 @@ class MonitorService : Service() {
 
     private fun releaseInspectLock() {
         val lock = inspectLock ?: return
-        if (lock.isHeld) {
-            try {
-                lock.release()
-            } catch (_: Exception) {
-            }
-        }
-    }
-
-    private fun acquireRunLock() {
-        val pm = getSystemService(PowerManager::class.java)
-        val lock = runLock ?: pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "xymonitor:run").also {
-            it.setReferenceCounted(false)
-            runLock = it
-        }
-        if (!lock.isHeld) {
-            try {
-                lock.acquire(12 * 60 * 60 * 1000L)
-            } catch (_: Exception) {
-            }
-        }
-    }
-
-    private fun releaseRunLock() {
-        val lock = runLock ?: return
         if (lock.isHeld) {
             try {
                 lock.release()
@@ -294,8 +286,9 @@ class MonitorService : Service() {
     private fun buildRunningNotification(status: String): Notification {
         val open = activityPending(0, Intent(this, MainActivity::class.java))
         val time = if (prefs.lastCheckAt > 0) TIME_FMT.format(Date(prefs.lastCheckAt)) else "--:--"
-        val wait = if (prefs.nextWaitMs > 0) {
-            " · 下次 ${Interval.formatSeconds(prefs.nextWaitMs)} 秒"
+        val remain = InspectPlan.remainingMs(System.currentTimeMillis(), prefs.nextInspectAt)
+        val wait = if (remain > 0) {
+            " · 下次 ${Interval.formatSeconds(remain)} 秒"
         } else {
             ""
         }
@@ -321,11 +314,9 @@ class MonitorService : Service() {
 
     private fun shutdown() {
         DebugLog.i("服务停止")
-        running = false
-        worker?.interrupt()
-        worker = null
+        inspecting = false
+        InspectScheduler.cancel(this)
         releaseInspectLock()
-        releaseRunLock()
         AlertHaptic.stop(this, "停止监控")
         sendBroadcast(Intent(ACTION_STATUS).setPackage(packageName))
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -334,17 +325,26 @@ class MonitorService : Service() {
 
     companion object {
         const val ACTION_STATUS = "com.xymonitor.app.STATUS"
+        const val ACTION_START = "com.xymonitor.app.START"
         const val ACTION_STOP = "com.xymonitor.app.STOP"
+        const val ACTION_TICK = InspectScheduler.ACTION_TICK
         const val ACTION_ACK = "com.xymonitor.app.ACK"
         const val EXTRA_USER_ID = "user_id"
         private const val NOTIFICATION_ID = 1
         private const val ERROR_NOTIFICATION_ID = 2
-        private const val CHANGE_NOTIFICATION_ID = 3
         private val TIME_FMT = SimpleDateFormat("HH:mm:ss", Locale.CHINA)
 
         fun start(context: Context, userId: String) {
             val intent = Intent(context, MonitorService::class.java)
+                .setAction(ACTION_START)
                 .putExtra(EXTRA_USER_ID, userId)
+            ContextCompat.startForegroundService(context, intent)
+        }
+
+        fun tick(context: Context) {
+            val intent = Intent(context, MonitorService::class.java)
+                .setAction(ACTION_TICK)
+                .putExtra(EXTRA_USER_ID, Prefs(context).userId)
             ContextCompat.startForegroundService(context, intent)
         }
 
@@ -353,8 +353,8 @@ class MonitorService : Service() {
             Prefs(context).apply {
                 running = false
                 lastStatus = "已停止"
-                nextWaitMs = 0L
             }
+            InspectScheduler.cancel(context)
             val intent = Intent(context, MonitorService::class.java).setAction(ACTION_STOP)
             try {
                 context.startService(intent)
@@ -362,5 +362,7 @@ class MonitorService : Service() {
                 context.stopService(Intent(context, MonitorService::class.java))
             }
         }
+
+        private fun yesNo(value: Boolean): String = if (value) "是" else "否"
     }
 }
