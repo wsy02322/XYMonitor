@@ -8,6 +8,38 @@ import androidx.core.app.NotificationCompat
 
 object ChangeAlert {
     fun fire(context: Context, itemId: String, reason: String) {
+        emit(
+            context = context,
+            title = "第一件变化",
+            message = itemId,
+            reason = reason,
+            playSound = true,
+            extraSound = ExtraSound.NEW_ITEM,
+            notifyId = 3,
+        )
+    }
+
+    fun fireError(context: Context, message: String, playSound: Boolean) {
+        emit(
+            context = context,
+            title = "巡检失败",
+            message = message.ifBlank { "未知错误" },
+            reason = "出错",
+            playSound = playSound,
+            extraSound = if (playSound) ExtraSound.BEEP else ExtraSound.NONE,
+            notifyId = 2,
+        )
+    }
+
+    private fun emit(
+        context: Context,
+        title: String,
+        message: String,
+        reason: String,
+        playSound: Boolean,
+        extraSound: ExtraSound,
+        notifyId: Int,
+    ) {
         val app = context.applicationContext
         val prefs = Prefs(app)
         val visible = AppForeground.monitorVisible
@@ -16,49 +48,55 @@ object ChangeAlert {
         val fsi = AlertChannels.canUseFullScreen(app)
         AlertHaptic.start(app)
         AlertChannels.sync(app, prefs.newItemSoundUri)
-        SoundPlayer().playNewItem(app, prefs.newItemSoundUri)
-        val posted = postNotification(app, itemId)
+        when (extraSound) {
+            ExtraSound.NEW_ITEM -> SoundPlayer().playNewItem(app, prefs.newItemSoundUri)
+            ExtraSound.BEEP -> SoundPlayer().playBeep()
+            ExtraSound.NONE -> {}
+        }
+        val posted = postNotification(app, title, message, notifyId, silent = !playSound)
         DebugLog.i(
-            "提醒($reason) 震动=开始 声音=已播 通知=${if (posted) "已发" else "失败"} " +
+            "提醒($reason) 震动=开始 声音=${if (playSound) "已播" else "关闭"} " +
+                "通知=${if (posted) "已发" else "失败"} " +
                 "前台=${if (visible) "是" else "否"} 白名单=${if (whitelist) "是" else "否"} " +
-                "通知权限=${if (notifyOk) "是" else "否"} 全屏=${if (fsi) "是" else "否"} id=$itemId",
+                "通知权限=${if (notifyOk) "是" else "否"} 全屏=${if (fsi) "是" else "否"}",
         )
         if (visible) {
             try {
-                app.startActivity(
-                    Intent(app, ErrorAlertActivity::class.java)
-                        .putExtra(ErrorAlertActivity.EXTRA_TITLE, "第一件变化")
-                        .putExtra(ErrorAlertActivity.EXTRA_MESSAGE, itemId)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
-                )
+                app.startActivity(alertIntent(app, title, message))
             } catch (e: Exception) {
                 DebugLog.i("弹窗失败 ${e.message}")
             }
         }
     }
 
-    private fun postNotification(context: Context, itemId: String): Boolean {
+    private fun postNotification(
+        context: Context,
+        title: String,
+        message: String,
+        notifyId: Int,
+        silent: Boolean,
+    ): Boolean {
         return try {
             val pending = PendingIntent.getActivity(
                 context,
-                3,
-                Intent(context, ErrorAlertActivity::class.java)
-                    .putExtra(ErrorAlertActivity.EXTRA_TITLE, "第一件变化")
-                    .putExtra(ErrorAlertActivity.EXTRA_MESSAGE, itemId)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                notifyId,
+                alertIntent(context, title, message),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
             val ack = PendingIntent.getBroadcast(
                 context,
-                103,
+                notifyId + 100,
                 Intent(context, AlertAckReceiver::class.java).setAction(MonitorService.ACTION_ACK),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
-            val notification = NotificationCompat.Builder(context, AlertChannels.alertChannelId(Prefs(context).newItemSoundUri))
+            val notification = NotificationCompat.Builder(
+                context,
+                AlertChannels.alertChannelId(Prefs(context).newItemSoundUri),
+            )
                 .setSmallIcon(R.drawable.ic_notify)
-                .setContentTitle("第一件变化")
-                .setContentText(itemId)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(itemId))
+                .setContentTitle(title)
+                .setContentText(message)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(message))
                 .setAutoCancel(true)
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -66,18 +104,28 @@ object ChangeAlert {
                 .setContentIntent(pending)
                 .setDeleteIntent(ack)
                 .apply {
+                    if (silent) setSilent(true)
                     if (AlertChannels.canUseFullScreen(context)) {
                         setFullScreenIntent(pending, true)
                     }
                 }
                 .build()
-            context.getSystemService(NotificationManager::class.java).notify(3, notification)
+            context.getSystemService(NotificationManager::class.java).notify(notifyId, notification)
             true
         } catch (e: Exception) {
             DebugLog.i("通知失败 ${e.message}")
             false
         }
     }
+
+    private fun alertIntent(context: Context, title: String, message: String): Intent {
+        return Intent(context, ErrorAlertActivity::class.java)
+            .putExtra(ErrorAlertActivity.EXTRA_TITLE, title)
+            .putExtra(ErrorAlertActivity.EXTRA_MESSAGE, message)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+    }
+
+    private enum class ExtraSound { NONE, NEW_ITEM, BEEP }
 }
 
 object Health {

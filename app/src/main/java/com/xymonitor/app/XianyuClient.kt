@@ -3,9 +3,12 @@ package com.xymonitor.app
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStream
+import java.net.ConnectException
 import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
 import java.net.URL
 import java.net.URLEncoder
+import java.net.UnknownHostException
 import java.util.concurrent.ConcurrentHashMap
 
 class XianyuClient(
@@ -14,6 +17,16 @@ class XianyuClient(
     private val cookies = ConcurrentHashMap<String, String>()
 
     fun fetchFirstCardId(userId: String): String {
+        return try {
+            fetchOnce(userId)
+        } catch (e: Exception) {
+            if (e is InterruptedException || !isRetryable(e)) throw e
+            DebugLog.i("巡检重试 原因=${e.message}")
+            fetchOnce(userId)
+        }
+    }
+
+    private fun fetchOnce(userId: String): String {
         val first = request(userId)
         val firstJson = JSONObject(first)
         val json = if (Mtop.isTokenError(firstJson)) {
@@ -44,7 +57,7 @@ class XianyuClient(
             "type" to "originaljson",
             "accountSite" to "xianyu",
             "dataType" to "json",
-            "timeout" to "20000",
+            "timeout" to CONNECT_TIMEOUT_MS.toString(),
             "api" to Mtop.API,
             "sessionOption" to "AutoLoginOnly",
             "spm_cnt" to "a21ybx.item.0.0",
@@ -54,8 +67,8 @@ class XianyuClient(
         val url = URL("${Mtop.HOST}/h5/${Mtop.API}/${Mtop.VERSION}/?$query")
         val conn = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
-            connectTimeout = 15_000
-            readTimeout = 20_000
+            connectTimeout = CONNECT_TIMEOUT_MS
+            readTimeout = READ_TIMEOUT_MS
             doInput = true
             doOutput = true
             instanceFollowRedirects = true
@@ -119,4 +132,21 @@ class XianyuClient(
     }
 
     private fun enc(value: String): String = URLEncoder.encode(value, "UTF-8")
+
+    companion object {
+        const val CONNECT_TIMEOUT_MS = 8_000
+        const val READ_TIMEOUT_MS = 8_000
+        const val INSPECT_LOCK_MS = 45_000L
+
+        fun isRetryable(error: Throwable): Boolean {
+            if (error is InterruptedException) return false
+            if (error is ConnectException || error is SocketTimeoutException || error is UnknownHostException) {
+                return true
+            }
+            val message = error.message.orEmpty()
+            return message.contains("Failed to connect", ignoreCase = true) ||
+                message.contains("timeout", ignoreCase = true) ||
+                message.contains("Unable to resolve", ignoreCase = true)
+        }
+    }
 }

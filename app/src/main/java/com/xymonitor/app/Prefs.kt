@@ -73,6 +73,11 @@ class Prefs(context: Context) {
         }
     }
 
+    fun clearSessionTiming() {
+        lastPlannedWaitMs = 0L
+        lastActualGapMs = 0L
+    }
+
     companion object {
         private const val KEY_USER_ID = "user_id"
         private const val KEY_RUNNING = "running"
