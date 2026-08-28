@@ -31,16 +31,16 @@
 curl -fsSL https://raw.githubusercontent.com/wsy02322/XYMonitor/cursor/xianyu-monitor-5624/server/install.sh | bash
 ```
 
-会安装到 `/opt/xymonitor`、用 systemd 保活、生成密钥，最后打印要填进 App 的地址和密钥。再跑一次就是更新代码并重启。
+会安装到 `/opt/xymonitor`、用 systemd 保活、生成密钥，并自动选一个空闲端口（默认避开可能已被占用的 8787 / 8788）。结束时打印要填进 App 的地址和密钥。再跑一次就是更新并重启，端口不变。
 
-云厂商安全组放行 TCP **8787**。看日志：`journalctl -u xymonitor -f`
+云厂商安全组放行脚本打印的那个 TCP 端口。看日志：`journalctl -u xymonitor -f`
 
 可选 Telegram：编辑 `/opt/xymonitor/env` 填 `TELEGRAM_BOT_TOKEN` 和 `TELEGRAM_CHAT_ID`，然后 `systemctl restart xymonitor`。
 
 ### 2. App
 
 1. 安装 Debug APK，或 `./gradlew assembleDebug`
-2. 填服务器地址，例如 `http://你的VPS:8787`
+2. 填服务器地址（用安装结束时打印的，不要默认当成 8787）
 3. 填和 VPS 相同的密钥
 4. 填卖家 `userId`（主页链接里的数字）
 5. 间隔 A～B 是**服务器打闲鱼**的间隔（默认 180～240 秒）

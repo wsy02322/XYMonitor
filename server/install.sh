@@ -3,11 +3,80 @@
 #   curl -fsSL https://raw.githubusercontent.com/wsy02322/XYMonitor/cursor/xianyu-monitor-5624/server/install.sh | bash
 set -euo pipefail
 
-PORT="${XY_PORT:-8787}"
 DEST="${XY_HOME:-/opt/xymonitor}"
 REPO="${XY_REPO:-https://github.com/wsy02322/XYMonitor.git}"
 REF="${XY_REF:-cursor/xianyu-monitor-5624}"
 SERVICE="/etc/systemd/system/xymonitor.service"
+
+port_free() {
+  python3 - "$1" <<'PY'
+import socket, sys
+port = int(sys.argv[1])
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+try:
+    s.bind(("0.0.0.0", port))
+except OSError:
+    sys.exit(1)
+finally:
+    s.close()
+PY
+}
+
+read_env_port() {
+  local file="$1"
+  [[ -f "$file" ]] || return 1
+  grep -E '^XY_PORT=' "$file" | tail -1 | cut -d= -f2- | tr -d '[:space:]'
+}
+
+pick_port() {
+  python3 - <<'PY'
+import socket
+# 8787 / 8788 这台机器上可能已被占用，默认不用。
+skip = {8787, 8788}
+candidates = (
+    list(range(18787, 18820))
+    + list(range(28787, 28810))
+    + [19870, 26981, 40187, 41287, 50187, 51234, 52080, 58080]
+)
+for port in candidates:
+    if port in skip:
+        continue
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        s.bind(("0.0.0.0", port))
+    except OSError:
+        s.close()
+        continue
+    s.close()
+    print(port)
+    break
+else:
+    raise SystemExit("没有找到空闲端口")
+PY
+}
+
+write_env() {
+  local port="$1"
+  if [[ ! -f "$DEST/env" ]]; then
+    cat > "$DEST/env" <<EOF
+XY_HOST=0.0.0.0
+XY_PORT=$port
+XY_TOKEN_FILE=$DEST/.token
+XY_STATE_FILE=$DEST/data/state.json
+# TELEGRAM_BOT_TOKEN=
+# TELEGRAM_CHAT_ID=
+EOF
+    chmod 600 "$DEST/env"
+    return
+  fi
+  if grep -qE '^XY_PORT=' "$DEST/env"; then
+    sed -i "s/^XY_PORT=.*/XY_PORT=$port/" "$DEST/env"
+  else
+    printf '\nXY_PORT=%s\n' "$port" >> "$DEST/env"
+  fi
+}
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "请用 root 执行" >&2
@@ -60,17 +129,27 @@ if [[ ! -f "$DEST/.token" ]]; then
   chmod 600 "$DEST/.token"
 fi
 
-if [[ ! -f "$DEST/env" ]]; then
-  cat > "$DEST/env" <<EOF
-XY_HOST=0.0.0.0
-XY_PORT=$PORT
-XY_TOKEN_FILE=$DEST/.token
-XY_STATE_FILE=$DEST/data/state.json
-# TELEGRAM_BOT_TOKEN=
-# TELEGRAM_CHAT_ID=
-EOF
-  chmod 600 "$DEST/env"
+if systemctl is-active --quiet xymonitor 2>/dev/null; then
+  systemctl stop xymonitor
 fi
+
+PORT=""
+if [[ -n "${XY_PORT:-}" ]]; then
+  PORT="$XY_PORT"
+elif [[ -f "$DEST/env" ]]; then
+  PORT="$(read_env_port "$DEST/env" || true)"
+fi
+if [[ -z "$PORT" ]]; then
+  PORT="$(pick_port)"
+elif ! port_free "$PORT"; then
+  if [[ -n "${XY_PORT:-}" ]]; then
+    echo "端口 $PORT 已被占用，换一个再装，或先关掉占用它的程序" >&2
+    exit 1
+  fi
+  echo "原端口 $PORT 已被占用，改选空闲端口"
+  PORT="$(pick_port)"
+fi
+write_env "$PORT"
 
 cat > "$SERVICE" <<EOF
 [Unit]
