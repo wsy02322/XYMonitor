@@ -34,6 +34,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusView: TextView
     private lateinit var startButton: Button
     private lateinit var stopButton: Button
+    private lateinit var fullscreenStatus: TextView
 
     private val notifyPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -50,7 +51,9 @@ class MainActivity : AppCompatActivity() {
     ) { result ->
         if (result.resultCode != RESULT_OK) return@registerForActivityResult
         val uri = pickedRingtone(result.data)
+        persistSoundUri(uri)
         prefs.newItemSoundUri = uri?.toString().orEmpty()
+        AlertChannels.sync(this, prefs.newItemSoundUri)
         render()
     }
 
@@ -72,6 +75,7 @@ class MainActivity : AppCompatActivity() {
         statusView = findViewById(R.id.status)
         startButton = findViewById(R.id.start)
         stopButton = findViewById(R.id.stop)
+        fullscreenStatus = findViewById(R.id.fullscreenStatus)
         userIdInput.setText(prefs.userId)
         intervalAInput.setText(prefs.intervalA.toString())
         intervalBInput.setText(prefs.intervalB.toString())
@@ -84,6 +88,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.pickSound).setOnClickListener { openSoundPicker() }
         findViewById<Button>(R.id.resetSound).setOnClickListener {
             prefs.newItemSoundUri = ""
+            AlertChannels.sync(this, "")
             render()
         }
         errorSoundBox.setOnCheckedChangeListener { _, checked ->
@@ -92,6 +97,8 @@ class MainActivity : AppCompatActivity() {
         intervalAInput.setOnFocusChangeListener { _, hasFocus -> if (!hasFocus) persistSettings() }
         intervalBInput.setOnFocusChangeListener { _, hasFocus -> if (!hasFocus) persistSettings() }
         findViewById<Button>(R.id.battery).setOnClickListener { openBatterySettings() }
+        findViewById<Button>(R.id.fullscreen).setOnClickListener { openFullScreenSettings() }
+        AlertChannels.sync(this, prefs.newItemSoundUri)
         render()
     }
 
@@ -198,6 +205,32 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun persistSoundUri(uri: Uri?) {
+        if (uri == null) return
+        try {
+            contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION,
+            )
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun openFullScreenSettings() {
+        if (Build.VERSION.SDK_INT < 34) {
+            Toast.makeText(this, getString(R.string.fullscreen_on), Toast.LENGTH_SHORT).show()
+            return
+        }
+        try {
+            startActivity(
+                Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT)
+                    .setData(Uri.parse("package:$packageName")),
+            )
+        } catch (_: Exception) {
+            Toast.makeText(this, "请在系统设置中允许全屏通知", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private fun openBatterySettings() {
         try {
             startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
@@ -215,6 +248,11 @@ class MainActivity : AppCompatActivity() {
         errorSoundBox.isChecked = prefs.errorSound
         errorSoundBox.setOnCheckedChangeListener { _, checked -> prefs.errorSound = checked }
         soundLabel.text = getString(R.string.sound_value, soundName())
+        fullscreenStatus.text = if (AlertChannels.canUseFullScreen(this)) {
+            getString(R.string.fullscreen_on)
+        } else {
+            getString(R.string.fullscreen_off)
+        }
         if (!intervalAInput.hasFocus()) intervalAInput.setText(prefs.intervalA.toString())
         if (!intervalBInput.hasFocus()) intervalBInput.setText(prefs.intervalB.toString())
         val time = if (prefs.lastCheckAt > 0) {

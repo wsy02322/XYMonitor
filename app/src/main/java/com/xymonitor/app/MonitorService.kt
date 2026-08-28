@@ -1,7 +1,6 @@
 package com.xymonitor.app
 
 import android.app.Notification
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
@@ -10,6 +9,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
@@ -20,8 +20,9 @@ import java.util.Locale
 class MonitorService : Service() {
     private val prefs by lazy { Prefs(this) }
     private val client = XianyuClient()
-    private val sounds by lazy { SoundPlayer(this) }
+    private val sounds = SoundPlayer()
     private var worker: Thread? = null
+    private var inspectLock: PowerManager.WakeLock? = null
     @Volatile private var running = false
     @Volatile private var userId: String = ""
 
@@ -47,6 +48,7 @@ class MonitorService : Service() {
         prefs.userId = nextUserId
         prefs.resetFirstIdIfUserChanged(nextUserId)
         prefs.running = true
+        AlertChannels.sync(this, prefs.newItemSoundUri)
         startInForeground()
         startLoop(nextUserId)
         return START_STICKY
@@ -56,7 +58,7 @@ class MonitorService : Service() {
         running = false
         worker?.interrupt()
         worker = null
-        sounds.release()
+        releaseInspectLock()
         super.onDestroy()
     }
 
@@ -84,57 +86,130 @@ class MonitorService : Service() {
     }
 
     private fun inspectOnce(currentUserId: String) {
-        val outcome = try {
-            val currentFirstId = client.fetchFirstCardId(currentUserId)
-            val result = Inspector.compare(prefs.lastFirstItemId, currentFirstId)
-            if (result.ok) {
-                prefs.lastFirstItemId = result.firstId
+        acquireInspectLock()
+        try {
+            val outcome = try {
+                val currentFirstId = client.fetchFirstCardId(currentUserId)
+                val result = Inspector.compare(prefs.lastFirstItemId, currentFirstId)
+                if (result.ok) {
+                    prefs.lastFirstItemId = result.firstId
+                }
+                result
+            } catch (_: InterruptedException) {
+                return
+            } catch (e: Exception) {
+                Inspector.fail(e.message ?: e.javaClass.simpleName)
             }
-            result
-        } catch (_: InterruptedException) {
-            return
-        } catch (e: Exception) {
-            Inspector.fail(e.message ?: e.javaClass.simpleName)
-        }
 
-        prefs.lastCheckAt = System.currentTimeMillis()
-        if (outcome.ok) {
-            prefs.lastError = ""
-            prefs.lastStatus = when {
-                outcome.baseline -> "已记下第一件 ${outcome.firstId}"
-                outcome.changed -> "第一件变为 ${outcome.firstId}"
-                else -> "第一件未变 ${outcome.firstId}"
+            prefs.lastCheckAt = System.currentTimeMillis()
+            if (outcome.ok) {
+                prefs.lastError = ""
+                prefs.lastStatus = when {
+                    outcome.baseline -> "已记下第一件 ${outcome.firstId}"
+                    outcome.changed -> "第一件变为 ${outcome.firstId}"
+                    else -> "第一件未变 ${outcome.firstId}"
+                }
+                if (outcome.changed) {
+                    postChangeNotification(outcome.firstId)
+                }
+            } else {
+                prefs.lastError = outcome.error.orEmpty()
+                prefs.lastStatus = "巡检失败"
+                alertError(outcome.error.orEmpty())
             }
-            cancelErrorNotification()
-            if (outcome.changed) {
-                sounds.playNewItem(prefs.newItemSoundUri)
-            }
-        } else {
-            prefs.lastError = outcome.error.orEmpty()
-            prefs.lastStatus = "巡检失败"
-            alertError(outcome.error.orEmpty())
+            notifyStatus()
+            sendBroadcast(Intent(ACTION_STATUS).setPackage(packageName))
+        } finally {
+            releaseInspectLock()
         }
-        notifyStatus()
-        sendBroadcast(Intent(ACTION_STATUS).setPackage(packageName))
+    }
+
+    private fun acquireInspectLock() {
+        val pm = getSystemService(PowerManager::class.java)
+        val lock = inspectLock ?: pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "xymonitor:inspect").also {
+            it.setReferenceCounted(false)
+            inspectLock = it
+        }
+        if (!lock.isHeld) {
+            try {
+                lock.acquire(30_000)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun releaseInspectLock() {
+        val lock = inspectLock ?: return
+        if (lock.isHeld) {
+            try {
+                lock.release()
+            } catch (_: Exception) {
+            }
+        }
     }
 
     private fun alertError(message: String) {
         if (prefs.errorSound) {
             sounds.playBeep()
         }
-        postErrorNotification(message)
+        val text = message.ifBlank { "未知错误" }
+        postAlertNotification(
+            id = ERROR_NOTIFICATION_ID,
+            channelId = AlertChannels.ERROR,
+            title = "巡检失败",
+            text = text,
+            requestCode = 2,
+        )
         try {
-            startActivity(
-                Intent(this, ErrorAlertActivity::class.java)
-                    .putExtra(ErrorAlertActivity.EXTRA_MESSAGE, message.ifBlank { "未知错误" })
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
-            )
+            startActivity(alertIntent("巡检失败", text))
         } catch (_: Exception) {
         }
     }
 
+    private fun postChangeNotification(itemId: String) {
+        AlertChannels.sync(this, prefs.newItemSoundUri)
+        postAlertNotification(
+            id = CHANGE_NOTIFICATION_ID,
+            channelId = AlertChannels.alertChannelId(prefs.newItemSoundUri),
+            title = "第一件变化",
+            text = itemId,
+            requestCode = 3,
+        )
+    }
+
+    private fun alertIntent(title: String, text: String): Intent {
+        return Intent(this, ErrorAlertActivity::class.java)
+            .putExtra(ErrorAlertActivity.EXTRA_TITLE, title)
+            .putExtra(ErrorAlertActivity.EXTRA_MESSAGE, text)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+    }
+
+    private fun postAlertNotification(
+        id: Int,
+        channelId: String,
+        title: String,
+        text: String,
+        requestCode: Int,
+    ) {
+        val pending = activityPending(requestCode, alertIntent(title, text))
+        val builder = NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(R.drawable.ic_notify)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pending)
+        if (AlertChannels.canUseFullScreen(this)) {
+            builder.setFullScreenIntent(pending, true)
+        }
+        getSystemService(NotificationManager::class.java).notify(id, builder.build())
+    }
+
     private fun startInForeground() {
-        ensureChannels()
+        AlertChannels.sync(this, prefs.newItemSoundUri)
         val notification = buildRunningNotification(prefs.lastStatus.ifBlank { "启动中" })
         if (Build.VERSION.SDK_INT >= 29) {
             ServiceCompat.startForeground(
@@ -161,7 +236,7 @@ class MonitorService : Service() {
         } else {
             ""
         }
-        return NotificationCompat.Builder(this, CHANNEL_RUNNING)
+        return NotificationCompat.Builder(this, AlertChannels.RUNNING)
             .setSmallIcon(R.drawable.ic_notify)
             .setContentTitle(getString(R.string.app_name))
             .setContentText("运行中 · $time · $status$wait")
@@ -170,27 +245,6 @@ class MonitorService : Service() {
             .setContentIntent(open)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .build()
-    }
-
-    private fun postErrorNotification(message: String) {
-        ensureChannels()
-        val dialog = Intent(this, ErrorAlertActivity::class.java)
-            .putExtra(ErrorAlertActivity.EXTRA_MESSAGE, message.ifBlank { "未知错误" })
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        val notification = NotificationCompat.Builder(this, CHANNEL_ERROR)
-            .setSmallIcon(R.drawable.ic_notify)
-            .setContentTitle("巡检失败")
-            .setContentText(message.ifBlank { "未知错误" })
-            .setStyle(NotificationCompat.BigTextStyle().bigText(message.ifBlank { "未知错误" }))
-            .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setContentIntent(activityPending(2, dialog))
-            .build()
-        getSystemService(NotificationManager::class.java).notify(ERROR_NOTIFICATION_ID, notification)
-    }
-
-    private fun cancelErrorNotification() {
-        getSystemService(NotificationManager::class.java).cancel(ERROR_NOTIFICATION_ID)
     }
 
     private fun activityPending(requestCode: Int, intent: Intent): PendingIntent {
@@ -202,29 +256,11 @@ class MonitorService : Service() {
         )
     }
 
-    private fun ensureChannels() {
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(
-            NotificationChannel(
-                CHANNEL_RUNNING,
-                getString(R.string.notify_channel),
-                NotificationManager.IMPORTANCE_LOW,
-            ),
-        )
-        val error = NotificationChannel(
-            CHANNEL_ERROR,
-            getString(R.string.notify_error_channel),
-            NotificationManager.IMPORTANCE_HIGH,
-        )
-        error.enableVibration(true)
-        manager.createNotificationChannel(error)
-    }
-
     private fun shutdown() {
         running = false
         worker?.interrupt()
         worker = null
-        sounds.release()
+        releaseInspectLock()
         sendBroadcast(Intent(ACTION_STATUS).setPackage(packageName))
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -234,10 +270,9 @@ class MonitorService : Service() {
         const val ACTION_STATUS = "com.xymonitor.app.STATUS"
         const val ACTION_STOP = "com.xymonitor.app.STOP"
         const val EXTRA_USER_ID = "user_id"
-        private const val CHANNEL_RUNNING = "monitor"
-        private const val CHANNEL_ERROR = "monitor_error"
         private const val NOTIFICATION_ID = 1
         private const val ERROR_NOTIFICATION_ID = 2
+        private const val CHANGE_NOTIFICATION_ID = 3
         private val TIME_FMT = SimpleDateFormat("HH:mm:ss", Locale.CHINA)
 
         fun start(context: Context, userId: String) {

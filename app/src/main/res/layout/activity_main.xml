@@ -188,6 +188,22 @@
             android:backgroundTint="@color/muted_btn"
             android:text="@string/battery" />
 
+        <Button
+            android:id="@+id/fullscreen"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:backgroundTint="@color/muted_btn"
+            android:text="@string/fullscreen" />
+
+        <TextView
+            android:id="@+id/fullscreenStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textColor="@color/muted"
+            android:textSize="13sp" />
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
