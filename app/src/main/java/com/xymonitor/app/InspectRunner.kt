@@ -77,8 +77,7 @@ object InspectRunner {
         val previousCheck = prefs.lastCheckAt
         val planned = prefs.lastPlannedWaitMs
         val outcome = try {
-            NetworkWait.awaitValidated(app)
-            val currentFirstId = client.fetchFirstCardId(prefs.userId)
+            val currentFirstId = fetchList(app, prefs.userId)
             Inspector.compare(previousId, currentFirstId)
         } catch (_: InterruptedException) {
             DebugLog.i("巡检中断")
@@ -125,6 +124,29 @@ object InspectRunner {
             prefs.lastStatus = "巡检失败"
             DebugLog.i("巡检失败 ${outcome.error} 耗时=${Interval.formatSeconds(cost)}s")
             ChangeAlert.fireError(app, outcome.error.orEmpty())
+        }
+    }
+
+    private fun fetchList(app: Context, userId: String): String {
+        val status = NetworkWait.awaitValidated(app)
+        if (status == NetworkWait.NONE) {
+            DebugLog.i("无WiFi网络，直接走流量")
+            return fetchViaCellular(app, userId)
+        }
+        return try {
+            client.fetchFirstCardId(userId)
+        } catch (e: Exception) {
+            if (e is InterruptedException || !XianyuClient.isRetryable(e)) throw e
+            DebugLog.i("默认网络失败，改走流量 ${e.message}")
+            fetchViaCellular(app, userId)
+        }
+    }
+
+    private fun fetchViaCellular(app: Context, userId: String): String {
+        val session = CellularFallback.acquire(app)
+            ?: throw IllegalStateException("申请流量网络失败")
+        session.use {
+            return client.fetchFirstCardId(userId, it.network)
         }
     }
 

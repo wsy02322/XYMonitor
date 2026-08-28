@@ -29,7 +29,8 @@ class InspectPlanTest {
 
     @Test
     fun watchdogCoversWarmupAndRetries() {
-        assertEquals(30_000L, InspectPlan.WATCHDOG_MS)
+        assertEquals(45_000L, InspectPlan.WATCHDOG_MS)
+        assertTrue(InspectPlan.WATCHDOG_MS > CellularFallback.REQUEST_MS)
         assertTrue(InspectPlan.WATCHDOG_MS > XianyuClient.CONNECT_TIMEOUT_MS * 3)
         assertTrue(InspectPlan.WATCHDOG_MS >= NetworkWait.MAX_WAIT_MS + XianyuClient.DNS_BACKOFF_MS)
     }

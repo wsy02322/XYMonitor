@@ -25,6 +25,7 @@ object Ipv4 {
 object NetworkWait {
     const val MAX_WAIT_MS = 2_500L
     const val POLL_MS = 250L
+    const val NONE = "无网络"
 
     fun awaitValidated(context: Context): String {
         val cm = context.getSystemService(ConnectivityManager::class.java) ?: return "无Connectivity"
@@ -52,7 +53,7 @@ object NetworkWait {
     }
 
     private fun snapshot(cm: ConnectivityManager): String {
-        val net = cm.activeNetwork ?: return "无网络"
+        val net = cm.activeNetwork ?: return NONE
         val caps = cm.getNetworkCapabilities(net) ?: return "无能力"
         val validated = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
         val internet = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)

@@ -8,7 +8,7 @@ import android.os.Build
 
 object InspectPlan {
     const val GRACE_MS = 15_000L
-    const val WATCHDOG_MS = 30_000L
+    const val WATCHDOG_MS = 45_000L
 
     fun nextAt(nowMs: Long, delayMs: Long): Long = nowMs + delayMs.coerceAtLeast(0L)
 

@@ -1,5 +1,6 @@
 package com.xymonitor.app
 
+import android.net.Network
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStream
@@ -24,27 +25,33 @@ class XianyuClient(
 ) {
     private val cookies = ConcurrentHashMap<String, String>()
     private val current = AtomicReference<HttpURLConnection?>()
+    @Volatile private var via: Network? = null
 
-    fun fetchFirstCardId(userId: String): String {
-        var last: Exception? = null
-        repeat(MAX_ATTEMPTS) { index ->
-            try {
-                return fetchOnce(userId)
-            } catch (e: Exception) {
-                if (e is InterruptedException || !isRetryable(e)) throw e
-                last = e
-                val attempt = index + 1
-                if (attempt >= MAX_ATTEMPTS) return@repeat
-                val delay = if (isDnsFailure(e)) DNS_BACKOFF_MS else CONNECT_RETRY_MS
-                DebugLog.i("巡检重试 第${attempt}次 原因=${e.message} 等待=${Interval.formatSeconds(delay)}s")
+    fun fetchFirstCardId(userId: String, network: Network? = null): String {
+        via = network
+        try {
+            var last: Exception? = null
+            repeat(MAX_ATTEMPTS) { index ->
                 try {
-                    Thread.sleep(delay)
-                } catch (_: InterruptedException) {
-                    throw e
+                    return fetchOnce(userId)
+                } catch (e: Exception) {
+                    if (e is InterruptedException || !isRetryable(e)) throw e
+                    last = e
+                    val attempt = index + 1
+                    if (attempt >= MAX_ATTEMPTS) return@repeat
+                    val delay = if (isDnsFailure(e)) DNS_BACKOFF_MS else CONNECT_RETRY_MS
+                    DebugLog.i("巡检重试 第${attempt}次 原因=${e.message} 等待=${Interval.formatSeconds(delay)}s")
+                    try {
+                        Thread.sleep(delay)
+                    } catch (_: InterruptedException) {
+                        throw e
+                    }
                 }
             }
+            throw last ?: IllegalStateException("接口调用失败")
+        } finally {
+            via = null
         }
-        throw last ?: IllegalStateException("接口调用失败")
     }
 
     fun abort() {
@@ -120,10 +127,12 @@ class XianyuClient(
 
     private fun openHttps(pathAndQuery: String): HttpsURLConnection {
         val host = HOST
-        val resolved = InetAddress.getAllByName(host)
-        DebugLog.i("解析 $host ${Ipv4.describe(resolved)}")
+        val net = via
+        val resolved = if (net != null) net.allByName(host) else InetAddress.getAllByName(host)
+        DebugLog.i("解析 $host ${Ipv4.describe(resolved)}${if (net != null) " 经流量" else ""}")
         val ipv4 = Ipv4.pick(resolved)
-        val conn = URL("https://${ipv4.hostAddress}$pathAndQuery").openConnection() as HttpsURLConnection
+        val url = URL("https://${ipv4.hostAddress}$pathAndQuery")
+        val conn = (net?.openConnection(url) ?: url.openConnection()) as HttpsURLConnection
         conn.requestMethod = "POST"
         conn.connectTimeout = CONNECT_TIMEOUT_MS
         conn.readTimeout = READ_TIMEOUT_MS
@@ -213,7 +222,7 @@ class XianyuClient(
         const val HOST = "h5api.m.goofish.com"
         const val CONNECT_TIMEOUT_MS = 5_000
         const val READ_TIMEOUT_MS = 5_000
-        const val INSPECT_LOCK_MS = 35_000L
+        const val INSPECT_LOCK_MS = 50_000L
         const val MAX_ATTEMPTS = 3
         const val DNS_BACKOFF_MS = 1_500L
         const val CONNECT_RETRY_MS = 400L

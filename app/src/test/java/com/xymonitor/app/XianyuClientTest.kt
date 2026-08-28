@@ -14,7 +14,7 @@ class XianyuClientTest {
     fun timeoutsAreShort() {
         assertTrue(XianyuClient.CONNECT_TIMEOUT_MS == 5_000)
         assertTrue(XianyuClient.READ_TIMEOUT_MS == 5_000)
-        assertTrue(XianyuClient.INSPECT_LOCK_MS >= 35_000L)
+        assertTrue(XianyuClient.INSPECT_LOCK_MS >= 50_000L)
         assertTrue(XianyuClient.MAX_ATTEMPTS == 3)
     }
 
