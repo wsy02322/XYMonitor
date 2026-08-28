@@ -47,27 +47,18 @@ class Prefs(context: Context) {
         get() = sp.getLong(KEY_NEXT_WAIT, 0L)
         set(value) = sp.edit().putLong(KEY_NEXT_WAIT, value).apply()
 
-    val knownIds: Set<String>
-        get() = sp.getStringSet(KEY_KNOWN_IDS, emptySet())?.toSet().orEmpty()
+    var lastFirstItemId: String
+        get() = sp.getString(KEY_LAST_FIRST_ID, "").orEmpty()
+        set(value) = sp.edit().putString(KEY_LAST_FIRST_ID, value).apply()
 
-    fun resetKnownIfUserChanged(userId: String) {
+    fun resetFirstIdIfUserChanged(userId: String) {
         val previous = sp.getString(KEY_KNOWN_USER, "")
         if (previous != userId) {
             sp.edit()
                 .putString(KEY_KNOWN_USER, userId)
-                .putStringSet(KEY_KNOWN_IDS, emptySet())
+                .putString(KEY_LAST_FIRST_ID, "")
                 .apply()
         }
-    }
-
-    fun replaceKnown(ids: Collection<String>) {
-        sp.edit().putStringSet(KEY_KNOWN_IDS, ids.toSet()).apply()
-    }
-
-    fun addKnown(ids: Collection<String>) {
-        val next = knownIds.toMutableSet()
-        next.addAll(ids.filter { it.isNotBlank() })
-        sp.edit().putStringSet(KEY_KNOWN_IDS, next).apply()
     }
 
     companion object {
@@ -76,7 +67,7 @@ class Prefs(context: Context) {
         private const val KEY_LAST_CHECK = "last_check"
         private const val KEY_LAST_STATUS = "last_status"
         private const val KEY_LAST_ERROR = "last_error"
-        private const val KEY_KNOWN_IDS = "known_ids"
+        private const val KEY_LAST_FIRST_ID = "last_first_id"
         private const val KEY_KNOWN_USER = "known_user"
         private const val KEY_INTERVAL_A = "interval_a"
         private const val KEY_INTERVAL_B = "interval_b"

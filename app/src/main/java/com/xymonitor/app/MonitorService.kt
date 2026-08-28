@@ -45,7 +45,7 @@ class MonitorService : Service() {
         }
 
         prefs.userId = nextUserId
-        prefs.resetKnownIfUserChanged(nextUserId)
+        prefs.resetFirstIdIfUserChanged(nextUserId)
         prefs.running = true
         startInForeground()
         startLoop(nextUserId)
@@ -85,12 +85,10 @@ class MonitorService : Service() {
 
     private fun inspectOnce(currentUserId: String) {
         val outcome = try {
-            val current = client.fetchFirstPageIds(currentUserId)
-            val result = Inspector.compare(prefs.knownIds, current)
-            if (result.baseline) {
-                prefs.replaceKnown(current)
-            } else if (result.newIds.isNotEmpty()) {
-                prefs.addKnown(result.newIds)
+            val currentFirstId = client.fetchFirstCardId(currentUserId)
+            val result = Inspector.compare(prefs.lastFirstItemId, currentFirstId)
+            if (result.ok) {
+                prefs.lastFirstItemId = result.firstId
             }
             result
         } catch (_: InterruptedException) {
@@ -103,12 +101,12 @@ class MonitorService : Service() {
         if (outcome.ok) {
             prefs.lastError = ""
             prefs.lastStatus = when {
-                outcome.baseline -> "已建立基线，${outcome.itemIds.size} 件"
-                outcome.newIds.isNotEmpty() -> "发现 ${outcome.newIds.size} 件上新"
-                else -> "无上新，当前 ${outcome.itemIds.size} 件"
+                outcome.baseline -> "已记下第一件 ${outcome.firstId}"
+                outcome.changed -> "第一件变为 ${outcome.firstId}"
+                else -> "第一件未变 ${outcome.firstId}"
             }
             cancelErrorNotification()
-            if (outcome.newIds.isNotEmpty()) {
+            if (outcome.changed) {
                 sounds.playNewItem(prefs.newItemSoundUri)
             }
         } else {

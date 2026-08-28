@@ -5,9 +5,8 @@ import org.junit.Test
 
 class XianyuClientLiveTest {
     @Test
-    fun fetchFirstPageFromPublicSeller() {
-        val ids = XianyuClient().fetchFirstPageIds("1666703902")
-        assertTrue("should return first-page item ids, got $ids", ids.size >= 1)
-        assertTrue(ids.all { it.matches(Regex("\\d+")) })
+    fun fetchFirstCardFromPublicSeller() {
+        val id = XianyuClient().fetchFirstCardId("1666703902")
+        assertTrue("should return first card item id, got $id", id.matches(Regex("\\d+")))
     }
 }

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">闲鱼上新监控</string>
-    <string name="subtitle">按随机间隔检查指定卖家主页第一页</string>
+    <string name="subtitle">按随机间隔检查卖家主页列表第一件</string>
     <string name="user_id_label">卖家 userId</string>
     <string name="user_id_hint">例如 1666703902</string>
     <string name="start">开始监控</string>
@@ -20,5 +20,5 @@
     <string name="interval_a_hint">最短秒数</string>
     <string name="interval_b_hint">最长秒数</string>
     <string name="interval_hint">每次在 A～B 之间按毫秒随机等待，避免固定节奏被识别。过短更容易触发风控，建议 ≥ 60 秒，系统下限 30 秒。</string>
-    <string name="tips">首次成功只记当前商品，不响铃。之后出现新 item_id 播放你选择的提示音。请允许通知，并关闭对该应用的电池优化。</string>
+    <string name="tips">忽略置顶，只看普通列表第一件。第一次成功只记下该 item_id，不响铃。之后第一件 ID 变了就播放提示音。请允许通知，并关闭对该应用的电池优化。</string>
 </resources>

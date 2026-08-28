@@ -237,7 +237,7 @@ class MainActivity : AppCompatActivity() {
             append('\n')
             append("结果：${prefs.lastStatus}")
             append('\n')
-            append("已知商品：${prefs.knownIds.size} 个")
+            append("当前第一件：${prefs.lastFirstItemId.ifBlank { "—" }}")
             append('\n')
             append("错误：$error")
         }

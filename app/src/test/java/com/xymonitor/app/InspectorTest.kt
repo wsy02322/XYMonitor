@@ -8,34 +8,49 @@ import org.junit.Test
 class InspectorTest {
     @Test
     fun firstSuccessIsBaselineAndDoesNotAlert() {
-        val result = Inspector.compare(emptySet(), listOf("1", "2", "3"))
+        val result = Inspector.compare("", "111")
         assertTrue(result.ok)
         assertTrue(result.baseline)
-        assertTrue(result.newIds.isEmpty())
-        assertEquals(3, result.knownCount)
+        assertFalse(result.changed)
+        assertEquals("111", result.firstId)
     }
 
     @Test
-    fun laterNewIdIsDetected() {
-        val result = Inspector.compare(setOf("1", "2"), listOf("3", "2", "1"))
+    fun firstIdChangeAlerts() {
+        val result = Inspector.compare("111", "222")
         assertTrue(result.ok)
         assertFalse(result.baseline)
-        assertEquals(listOf("3"), result.newIds)
-        assertEquals(3, result.knownCount)
+        assertTrue(result.changed)
+        assertEquals("222", result.firstId)
     }
 
     @Test
-    fun missingOldIdIsNotTreatedAsNew() {
-        val result = Inspector.compare(setOf("1", "2", "3"), listOf("2", "3"))
-        assertTrue(result.newIds.isEmpty())
-        assertEquals(3, result.knownCount)
+    fun sameFirstIdDoesNotAlert() {
+        val result = Inspector.compare("111", "111")
+        assertTrue(result.ok)
+        assertFalse(result.changed)
     }
 
     @Test
-    fun failKeepsKnownUntouched() {
+    fun relistOldIdToFirstStillAlerts() {
+        val result = Inspector.compare("222", "111")
+        assertTrue(result.changed)
+        assertEquals("111", result.firstId)
+    }
+
+    @Test
+    fun emptyFirstPageIsFailure() {
+        val result = Inspector.compare("111", "")
+        assertFalse(result.ok)
+        assertFalse(result.changed)
+        assertEquals("第一页没有商品", result.error)
+    }
+
+    @Test
+    fun failDoesNotLookLikeAChange() {
         val fail = Inspector.fail("timeout")
         assertFalse(fail.ok)
-        assertTrue(fail.newIds.isEmpty())
+        assertFalse(fail.changed)
         assertEquals("timeout", fail.error)
     }
 }

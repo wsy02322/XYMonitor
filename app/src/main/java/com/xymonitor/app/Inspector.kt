@@ -3,31 +3,31 @@ package com.xymonitor.app
 data class InspectOutcome(
     val ok: Boolean,
     val baseline: Boolean,
-    val itemIds: List<String>,
-    val newIds: List<String>,
-    val knownCount: Int,
+    val changed: Boolean,
+    val firstId: String,
     val error: String?,
 )
 
 object Inspector {
-    fun compare(known: Set<String>, current: List<String>): InspectOutcome {
-        if (known.isEmpty()) {
+    fun compare(previousFirstId: String, currentFirstId: String): InspectOutcome {
+        if (currentFirstId.isBlank()) {
+            return fail("第一页没有商品")
+        }
+        if (previousFirstId.isBlank()) {
             return InspectOutcome(
                 ok = true,
                 baseline = true,
-                itemIds = current,
-                newIds = emptyList(),
-                knownCount = current.toSet().size,
+                changed = false,
+                firstId = currentFirstId,
                 error = null,
             )
         }
-        val newIds = current.filter { it.isNotBlank() && it !in known }.distinct()
+        val changed = previousFirstId != currentFirstId
         return InspectOutcome(
             ok = true,
             baseline = false,
-            itemIds = current,
-            newIds = newIds,
-            knownCount = known.size + newIds.size,
+            changed = changed,
+            firstId = currentFirstId,
             error = null,
         )
     }
@@ -36,9 +36,8 @@ object Inspector {
         return InspectOutcome(
             ok = false,
             baseline = false,
-            itemIds = emptyList(),
-            newIds = emptyList(),
-            knownCount = -1,
+            changed = false,
+            firstId = "",
             error = message,
         )
     }

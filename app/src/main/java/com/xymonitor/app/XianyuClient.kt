@@ -13,7 +13,7 @@ class XianyuClient(
 ) {
     private val cookies = ConcurrentHashMap<String, String>()
 
-    fun fetchFirstPageIds(userId: String): List<String> {
+    fun fetchFirstCardId(userId: String): String {
         val first = request(userId)
         val firstJson = JSONObject(first)
         val json = if (Mtop.isTokenError(firstJson)) {
@@ -27,7 +27,7 @@ class XianyuClient(
         if (!Mtop.isSuccess(json)) {
             throw IllegalStateException(Mtop.retText(json).ifBlank { "接口调用失败" })
         }
-        return Mtop.parseItemIds(json)
+        return Mtop.parseFirstCardId(json) ?: throw IllegalStateException("第一页没有商品")
     }
 
     internal fun request(userId: String): String {

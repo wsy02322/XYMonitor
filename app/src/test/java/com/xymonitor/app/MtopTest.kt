@@ -34,7 +34,8 @@ class MtopTest {
             }
         """.trimIndent()
         val ids = Mtop.parseItemIds(json)
-        assertEquals(listOf("999", "1031066924442", "1029988109330", "888"), ids)
+        assertEquals(listOf("1031066924442", "1029988109330", "888"), ids)
+        assertEquals("1031066924442", Mtop.parseFirstCardId(json))
     }
 
     @Test

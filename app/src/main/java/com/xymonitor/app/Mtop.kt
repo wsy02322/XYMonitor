@@ -49,7 +49,6 @@ object Mtop {
     fun parseItemIds(root: JSONObject): List<String> {
         val data = root.optJSONObject("data") ?: return emptyList()
         val seen = LinkedHashSet<String>()
-        addItem(seen, data.optJSONObject("topItem"))
         val cards = data.optJSONArray("cardList")
         if (cards != null) {
             for (i in 0 until cards.length()) {
@@ -58,6 +57,12 @@ object Mtop {
         }
         return seen.toList()
     }
+
+    fun parseFirstCardId(root: JSONObject): String? {
+        return parseItemIds(root).firstOrNull()
+    }
+
+    fun parseFirstCardId(json: String): String? = parseFirstCardId(JSONObject(json))
 
     fun parseItemIds(json: String): List<String> = parseItemIds(JSONObject(json))
 
