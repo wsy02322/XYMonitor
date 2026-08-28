@@ -300,9 +300,9 @@ class MainActivity : AppCompatActivity() {
             append('\n')
             append("错误：$error")
             append('\n')
-            append("电池优化：${if (Health.batteryIgnored(this)) "已忽略" else "未忽略（后台易被冻）"}")
+            append("电池优化：${if (Health.batteryIgnored(this@MainActivity)) "已忽略" else "未忽略（后台易被冻）"}")
             append('\n')
-            append("通知权限：${if (Health.notificationsEnabled(this)) "已开" else "未开"}")
+            append("通知权限：${if (Health.notificationsEnabled(this@MainActivity)) "已开" else "未开"}")
             if (prefs.lastActualGapMs > 0) {
                 append('\n')
                 append("距上次巡检 ${Interval.formatSeconds(prefs.lastActualGapMs)}s / 计划 ${Interval.formatSeconds(prefs.lastPlannedWaitMs)}s")
