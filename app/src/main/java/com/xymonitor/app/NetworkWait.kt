@@ -29,7 +29,7 @@ object NetworkWait {
     fun awaitValidated(context: Context): String {
         val cm = context.getSystemService(ConnectivityManager::class.java) ?: return "无Connectivity"
         val start = SystemClock.elapsedRealtime()
-        var last = "未知"
+        var last: String
         while (true) {
             val elapsed = SystemClock.elapsedRealtime() - start
             last = snapshot(cm)
