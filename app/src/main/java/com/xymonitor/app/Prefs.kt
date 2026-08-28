@@ -51,6 +51,14 @@ class Prefs(context: Context) {
         get() = sp.getString(KEY_LAST_FIRST_ID, "").orEmpty()
         set(value) = sp.edit().putString(KEY_LAST_FIRST_ID, value).apply()
 
+    var lastPlannedWaitMs: Long
+        get() = sp.getLong(KEY_PLANNED_WAIT, 0L)
+        set(value) = sp.edit().putLong(KEY_PLANNED_WAIT, value).apply()
+
+    var lastActualGapMs: Long
+        get() = sp.getLong(KEY_ACTUAL_GAP, 0L)
+        set(value) = sp.edit().putLong(KEY_ACTUAL_GAP, value).apply()
+
     fun resetFirstIdIfUserChanged(userId: String) {
         val previous = sp.getString(KEY_KNOWN_USER, "")
         if (previous != userId) {
@@ -74,5 +82,7 @@ class Prefs(context: Context) {
         private const val KEY_ERROR_SOUND = "error_sound"
         private const val KEY_NEW_ITEM_SOUND = "new_item_sound"
         private const val KEY_NEXT_WAIT = "next_wait"
+        private const val KEY_PLANNED_WAIT = "planned_wait"
+        private const val KEY_ACTUAL_GAP = "actual_gap"
     }
 }

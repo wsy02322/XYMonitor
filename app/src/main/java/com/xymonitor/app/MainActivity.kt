@@ -35,6 +35,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var startButton: Button
     private lateinit var stopButton: Button
     private lateinit var fullscreenStatus: TextView
+    private lateinit var debugLogView: TextView
 
     private val notifyPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -76,6 +77,7 @@ class MainActivity : AppCompatActivity() {
         startButton = findViewById(R.id.start)
         stopButton = findViewById(R.id.stop)
         fullscreenStatus = findViewById(R.id.fullscreenStatus)
+        debugLogView = findViewById(R.id.debugLog)
         userIdInput.setText(prefs.userId)
         intervalAInput.setText(prefs.intervalA.toString())
         intervalBInput.setText(prefs.intervalB.toString())
@@ -98,7 +100,20 @@ class MainActivity : AppCompatActivity() {
         intervalBInput.setOnFocusChangeListener { _, hasFocus -> if (!hasFocus) persistSettings() }
         findViewById<Button>(R.id.battery).setOnClickListener { openBatterySettings() }
         findViewById<Button>(R.id.fullscreen).setOnClickListener { openFullScreenSettings() }
-        statusView.setOnClickListener { AlertHaptic.stop(this) }
+        findViewById<Button>(R.id.probe).setOnClickListener {
+            DebugLog.init(this)
+            DebugLog.i("用户点试提醒 已记第一件=${prefs.lastFirstItemId.ifBlank { "-" }}")
+            ChangeAlert.fire(this, prefs.lastFirstItemId.ifBlank { "TEST" }, "试提醒")
+            render()
+        }
+        findViewById<Button>(R.id.copyLog).setOnClickListener {
+            val text = DebugLog.dump().ifBlank { DebugLog.snapshot() }
+            val clipboard = getSystemService(android.content.ClipboardManager::class.java)
+            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("XYMonitor", text))
+            Toast.makeText(this, "已复制调试日志", Toast.LENGTH_SHORT).show()
+        }
+        statusView.setOnClickListener { AlertHaptic.stop(this, "点状态栏") }
+        DebugLog.init(this)
         AlertChannels.sync(this, prefs.newItemSoundUri)
         render()
     }
@@ -106,7 +121,10 @@ class MainActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         AppForeground.monitorVisible = true
-        val filter = IntentFilter(MonitorService.ACTION_STATUS)
+        val filter = IntentFilter().apply {
+            addAction(MonitorService.ACTION_STATUS)
+            addAction(DebugLog.ACTION)
+        }
         if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(statusReceiver, filter, RECEIVER_NOT_EXPORTED)
         } else {
@@ -281,7 +299,19 @@ class MainActivity : AppCompatActivity() {
             append("当前第一件：${prefs.lastFirstItemId.ifBlank { "—" }}")
             append('\n')
             append("错误：$error")
+            append('\n')
+            append("电池优化：${if (Health.batteryIgnored(this)) "已忽略" else "未忽略（后台易被冻）"}")
+            append('\n')
+            append("通知权限：${if (Health.notificationsEnabled(this)) "已开" else "未开"}")
+            if (prefs.lastActualGapMs > 0) {
+                append('\n')
+                append("距上次巡检 ${Interval.formatSeconds(prefs.lastActualGapMs)}s / 计划 ${Interval.formatSeconds(prefs.lastPlannedWaitMs)}s")
+                if (Health.frozenHint(prefs.lastPlannedWaitMs, prefs.lastActualGapMs)) {
+                    append("（可能被冻）")
+                }
+            }
         }
+        debugLogView.text = DebugLog.snapshot(20)
     }
 
     companion object {

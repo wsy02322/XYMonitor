@@ -49,8 +49,15 @@ class MonitorService : Service() {
         prefs.userId = nextUserId
         prefs.resetFirstIdIfUserChanged(nextUserId)
         prefs.running = true
+        DebugLog.init(this)
+        DebugLog.i(
+            "服务启动 userId=$nextUserId 前台=${if (AppForeground.monitorVisible) "是" else "否"} " +
+                "白名单=${if (Health.batteryIgnored(this)) "是" else "否"} " +
+                "通知=${if (Health.notificationsEnabled(this)) "是" else "否"}",
+        )
         AlertChannels.sync(this, prefs.newItemSoundUri)
         acquireRunLock()
+        DebugLog.i("WakeLock(run)=${if (runLock?.isHeld == true) "持有" else "失败"}")
         startInForeground()
         startLoop(nextUserId)
         return START_STICKY
@@ -62,7 +69,7 @@ class MonitorService : Service() {
         worker = null
         releaseInspectLock()
         releaseRunLock()
-        AlertHaptic.stop(this)
+        AlertHaptic.stop(this, "服务销毁")
         super.onDestroy()
     }
 
@@ -72,12 +79,15 @@ class MonitorService : Service() {
         worker?.interrupt()
         userId = nextUserId
         running = true
+        DebugLog.i("巡检循环开始")
         worker = Thread({
             while (running) {
                 inspectOnce(nextUserId)
                 if (!running) break
                 val delay = Interval.nextDelayMs(prefs.intervalA, prefs.intervalB)
                 prefs.nextWaitMs = delay
+                prefs.lastPlannedWaitMs = delay
+                DebugLog.i("等待下次 ${Interval.formatSeconds(delay)} 秒")
                 notifyStatus()
                 sendBroadcast(Intent(ACTION_STATUS).setPackage(packageName))
                 try {
@@ -91,34 +101,56 @@ class MonitorService : Service() {
 
     private fun inspectOnce(currentUserId: String) {
         acquireInspectLock()
+        val started = System.currentTimeMillis()
+        val previousId = prefs.lastFirstItemId
+        val previousCheck = prefs.lastCheckAt
+        val planned = prefs.lastPlannedWaitMs
         try {
             val outcome = try {
                 val currentFirstId = client.fetchFirstCardId(currentUserId)
-                val result = Inspector.compare(prefs.lastFirstItemId, currentFirstId)
+                val result = Inspector.compare(previousId, currentFirstId)
                 if (result.ok) {
                     prefs.lastFirstItemId = result.firstId
                 }
                 result
             } catch (_: InterruptedException) {
+                DebugLog.i("巡检中断")
                 return
             } catch (e: Exception) {
                 Inspector.fail(e.message ?: e.javaClass.simpleName)
             }
 
-            prefs.lastCheckAt = System.currentTimeMillis()
+            val now = System.currentTimeMillis()
+            prefs.lastCheckAt = now
+            val cost = now - started
+            val gap = if (previousCheck > 0) now - previousCheck else 0L
+            prefs.lastActualGapMs = gap
+            val frozen = Health.frozenHint(planned, gap)
             if (outcome.ok) {
                 prefs.lastError = ""
+                val kind = when {
+                    outcome.baseline -> "基线"
+                    outcome.changed -> "变化"
+                    else -> "未变"
+                }
                 prefs.lastStatus = when {
                     outcome.baseline -> "已记下第一件 ${outcome.firstId}"
                     outcome.changed -> "第一件变为 ${outcome.firstId}"
                     else -> "第一件未变 ${outcome.firstId}"
                 }
+                DebugLog.i(
+                    "巡检 $kind 第一件=${outcome.firstId} 上次=${previousId.ifBlank { "-" }} " +
+                        "耗时=${Interval.formatSeconds(cost)}s 距上次=${Interval.formatSeconds(gap)}s " +
+                        "计划=${Interval.formatSeconds(planned)}s" +
+                        if (frozen) " 线程可能被冻" else "",
+                )
                 if (outcome.changed) {
-                    alertChange(outcome.firstId)
+                    ChangeAlert.fire(this, outcome.firstId, "上新")
                 }
             } else {
                 prefs.lastError = outcome.error.orEmpty()
                 prefs.lastStatus = "巡检失败"
+                DebugLog.i("巡检失败 ${outcome.error} 耗时=${Interval.formatSeconds(cost)}s")
                 alertError(outcome.error.orEmpty())
             }
             notifyStatus()
@@ -189,29 +221,11 @@ class MonitorService : Service() {
             requestCode = 2,
             silent = false,
         )
+        DebugLog.i("出错提醒 ${text} 发声=${prefs.errorSound}")
         try {
             startActivity(alertIntent("巡检失败", text))
-        } catch (_: Exception) {
-        }
-    }
-
-    private fun alertChange(itemId: String) {
-        AlertHaptic.start(this)
-        AlertChannels.sync(this, prefs.newItemSoundUri)
-        sounds.playNewItem(this, prefs.newItemSoundUri)
-        postAlertNotification(
-            id = CHANGE_NOTIFICATION_ID,
-            channelId = AlertChannels.alertChannelId(prefs.newItemSoundUri),
-            title = "第一件变化",
-            text = itemId,
-            requestCode = 3,
-            silent = false,
-        )
-        if (AppForeground.monitorVisible) {
-            try {
-                startActivity(alertIntent("第一件变化", itemId))
-            } catch (_: Exception) {
-            }
+        } catch (e: Exception) {
+            DebugLog.i("出错弹窗失败 ${e.message}")
         }
     }
 
@@ -306,12 +320,13 @@ class MonitorService : Service() {
     }
 
     private fun shutdown() {
+        DebugLog.i("服务停止")
         running = false
         worker?.interrupt()
         worker = null
         releaseInspectLock()
         releaseRunLock()
-        AlertHaptic.stop(this)
+        AlertHaptic.stop(this, "停止监控")
         sendBroadcast(Intent(ACTION_STATUS).setPackage(packageName))
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -334,7 +349,7 @@ class MonitorService : Service() {
         }
 
         fun stop(context: Context) {
-            AlertHaptic.stop(context)
+            AlertHaptic.stop(context, "停止监控")
             Prefs(context).apply {
                 running = false
                 lastStatus = "已停止"

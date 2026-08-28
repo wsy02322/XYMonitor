@@ -20,11 +20,13 @@ object AlertHaptic {
         app = context.applicationContext
         active = true
         acquireLock()
+        DebugLog.i("震动=循环开始 锁=${if (wakeLock?.isHeld == true) "持有" else "失败"}")
         handler.removeCallbacks(pulse)
         handler.post(pulse)
     }
 
-    fun stop(context: Context) {
+    fun stop(context: Context, reason: String = "未知") {
+        val was = active
         active = false
         handler.removeCallbacks(pulse)
         try {
@@ -32,6 +34,7 @@ object AlertHaptic {
         } catch (_: Exception) {
         }
         releaseLock()
+        if (was) DebugLog.i("停震 来源=$reason")
     }
 
     fun isActive(): Boolean = active

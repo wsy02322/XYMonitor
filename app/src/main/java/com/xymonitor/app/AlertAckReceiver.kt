@@ -6,6 +6,6 @@ import android.content.Intent
 
 class AlertAckReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
-        AlertHaptic.stop(context)
+        AlertHaptic.stop(context, "点通知")
     }
 }

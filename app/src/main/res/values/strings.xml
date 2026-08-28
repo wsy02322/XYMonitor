@@ -24,5 +24,7 @@
     <string name="interval_a_hint">最短秒数</string>
     <string name="interval_b_hint">最长秒数</string>
     <string name="interval_hint">每次在 A～B 之间按毫秒随机等待，避免固定节奏被识别。过短更容易触发风控，建议 ≥ 60 秒，系统下限 30 秒。</string>
-    <string name="tips">第一件 ID 变了会循环震动，直到你点通知、点弹窗确定、点状态栏或回到本页。停在本页时还会播一遍提示音。熄屏请打开通知并忽略电池优化。</string>
+    <string name="probe">试一次提醒（不改已记 ID）</string>
+    <string name="copy_log">复制调试日志</string>
+    <string name="tips">第一件 ID 变了会循环震动，直到你点通知、点弹窗确定、点状态栏。下方是调试日志；先点「试一次提醒」确认本机震动和声音。</string>
 </resources>

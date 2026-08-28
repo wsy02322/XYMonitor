@@ -181,6 +181,34 @@
             android:textSize="15sp" />
 
         <Button
+            android:id="@+id/probe"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/probe" />
+
+        <TextView
+            android:id="@+id/debugLog"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/status_bg"
+            android:fontFamily="monospace"
+            android:lineSpacingExtra="3dp"
+            android:padding="12dp"
+            android:textColor="@color/muted"
+            android:textIsSelectable="true"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/copyLog"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:backgroundTint="@color/muted_btn"
+            android:text="@string/copy_log" />
+
+        <Button
             android:id="@+id/battery"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

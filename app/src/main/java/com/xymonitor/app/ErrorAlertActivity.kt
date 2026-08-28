@@ -27,11 +27,11 @@ class ErrorAlertActivity : AppCompatActivity() {
             .setMessage(message)
             .setCancelable(true)
             .setPositiveButton("确定") { _, _ ->
-                AlertHaptic.stop(this)
+                AlertHaptic.stop(this, "点确定")
                 finish()
             }
             .setOnDismissListener {
-                AlertHaptic.stop(this)
+                AlertHaptic.stop(this, "关闭弹窗")
                 if (!isFinishing) finish()
             }
             .show()
