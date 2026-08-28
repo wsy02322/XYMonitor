@@ -13,7 +13,6 @@ import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
 import android.widget.Button
-import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
@@ -30,7 +29,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var intervalAInput: EditText
     private lateinit var intervalBInput: EditText
     private lateinit var soundLabel: TextView
-    private lateinit var errorSoundBox: CheckBox
     private lateinit var statusView: TextView
     private lateinit var startButton: Button
     private lateinit var stopButton: Button
@@ -72,7 +70,6 @@ class MainActivity : AppCompatActivity() {
         intervalAInput = findViewById(R.id.intervalA)
         intervalBInput = findViewById(R.id.intervalB)
         soundLabel = findViewById(R.id.soundLabel)
-        errorSoundBox = findViewById(R.id.errorSound)
         statusView = findViewById(R.id.status)
         startButton = findViewById(R.id.start)
         stopButton = findViewById(R.id.stop)
@@ -92,9 +89,6 @@ class MainActivity : AppCompatActivity() {
             prefs.newItemSoundUri = ""
             AlertChannels.sync(this, "")
             render()
-        }
-        errorSoundBox.setOnCheckedChangeListener { _, checked ->
-            prefs.errorSound = checked
         }
         intervalAInput.setOnFocusChangeListener { _, hasFocus -> if (!hasFocus) persistSettings() }
         intervalBInput.setOnFocusChangeListener { _, hasFocus -> if (!hasFocus) persistSettings() }
@@ -177,7 +171,6 @@ class MainActivity : AppCompatActivity() {
         val b = intervalBInput.text.toString().trim().toIntOrNull() ?: return false
         prefs.intervalA = a
         prefs.intervalB = b
-        prefs.errorSound = errorSoundBox.isChecked
         if (!intervalAInput.hasFocus()) intervalAInput.setText(prefs.intervalA.toString())
         if (!intervalBInput.hasFocus()) intervalBInput.setText(prefs.intervalB.toString())
         return true
@@ -290,9 +283,6 @@ class MainActivity : AppCompatActivity() {
         startButton.isEnabled = !running
         stopButton.isEnabled = running
         userIdInput.isEnabled = !running
-        errorSoundBox.setOnCheckedChangeListener(null)
-        errorSoundBox.isChecked = prefs.errorSound
-        errorSoundBox.setOnCheckedChangeListener { _, checked -> prefs.errorSound = checked }
         soundLabel.text = getString(R.string.sound_value, soundName())
         fullscreenStatus.text = if (AlertChannels.canUseFullScreen(this)) {
             getString(R.string.fullscreen_on)

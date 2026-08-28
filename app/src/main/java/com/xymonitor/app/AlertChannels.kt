@@ -10,7 +10,7 @@ import android.os.Build
 
 object AlertChannels {
     const val RUNNING = "monitor"
-    const val ERROR = "monitor_error"
+    const val ERROR = "monitor_error_mute"
     const val ALERT_PREFIX = "monitor_alarm_"
 
     fun alertChannelId(soundUri: String): String {
@@ -28,6 +28,9 @@ object AlertChannels {
         val manager = context.getSystemService(NotificationManager::class.java)
         ensureRunning(context, manager)
         ensureError(context, manager)
+        manager.notificationChannels
+            .filter { it.id == "monitor_error" }
+            .forEach { manager.deleteNotificationChannel(it.id) }
         val id = alertChannelId(soundUri)
         manager.notificationChannels
             .filter {
@@ -81,7 +84,8 @@ object AlertChannels {
             context.getString(R.string.notify_error_channel),
             NotificationManager.IMPORTANCE_HIGH,
         )
-        error.enableVibration(true)
+        error.setSound(null, null)
+        error.enableVibration(false)
         error.lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
         manager.createNotificationChannel(error)
     }

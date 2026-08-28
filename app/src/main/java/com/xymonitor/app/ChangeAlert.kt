@@ -14,19 +14,19 @@ object ChangeAlert {
             message = itemId,
             reason = reason,
             playSound = true,
-            extraSound = ExtraSound.NEW_ITEM,
+            channelId = AlertChannels.alertChannelId(Prefs(context.applicationContext).newItemSoundUri),
             notifyId = 3,
         )
     }
 
-    fun fireError(context: Context, message: String, playSound: Boolean) {
+    fun fireError(context: Context, message: String) {
         emit(
             context = context,
             title = "巡检失败",
             message = message.ifBlank { "未知错误" },
             reason = "出错",
-            playSound = playSound,
-            extraSound = if (playSound) ExtraSound.BEEP else ExtraSound.NONE,
+            playSound = false,
+            channelId = AlertChannels.ERROR,
             notifyId = 2,
         )
     }
@@ -37,7 +37,7 @@ object ChangeAlert {
         message: String,
         reason: String,
         playSound: Boolean,
-        extraSound: ExtraSound,
+        channelId: String,
         notifyId: Int,
     ) {
         val app = context.applicationContext
@@ -48,14 +48,12 @@ object ChangeAlert {
         val fsi = AlertChannels.canUseFullScreen(app)
         AlertHaptic.start(app)
         AlertChannels.sync(app, prefs.newItemSoundUri)
-        when (extraSound) {
-            ExtraSound.NEW_ITEM -> SoundPlayer().playNewItem(app, prefs.newItemSoundUri)
-            ExtraSound.BEEP -> SoundPlayer().playBeep()
-            ExtraSound.NONE -> {}
+        if (playSound) {
+            SoundPlayer().playNewItem(app, prefs.newItemSoundUri)
         }
-        val posted = postNotification(app, title, message, notifyId, silent = !playSound)
+        val posted = postNotification(app, title, message, notifyId, channelId, silent = !playSound)
         DebugLog.i(
-            "提醒($reason) 震动=开始 声音=${if (playSound) "已播" else "关闭"} " +
+            "提醒($reason) 震动=开始 声音=${if (playSound) "已播" else "关"} " +
                 "通知=${if (posted) "已发" else "失败"} " +
                 "前台=${if (visible) "是" else "否"} 白名单=${if (whitelist) "是" else "否"} " +
                 "通知权限=${if (notifyOk) "是" else "否"} 全屏=${if (fsi) "是" else "否"}",
@@ -74,6 +72,7 @@ object ChangeAlert {
         title: String,
         message: String,
         notifyId: Int,
+        channelId: String,
         silent: Boolean,
     ): Boolean {
         return try {
@@ -89,10 +88,7 @@ object ChangeAlert {
                 Intent(context, AlertAckReceiver::class.java).setAction(MonitorService.ACTION_ACK),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
-            val notification = NotificationCompat.Builder(
-                context,
-                AlertChannels.alertChannelId(Prefs(context).newItemSoundUri),
-            )
+            val notification = NotificationCompat.Builder(context, channelId)
                 .setSmallIcon(R.drawable.ic_notify)
                 .setContentTitle(title)
                 .setContentText(message)
@@ -104,7 +100,10 @@ object ChangeAlert {
                 .setContentIntent(pending)
                 .setDeleteIntent(ack)
                 .apply {
-                    if (silent) setSilent(true)
+                    if (silent) {
+                        setSilent(true)
+                        setSound(null)
+                    }
                     if (AlertChannels.canUseFullScreen(context)) {
                         setFullScreenIntent(pending, true)
                     }
@@ -124,8 +123,6 @@ object ChangeAlert {
             .putExtra(ErrorAlertActivity.EXTRA_MESSAGE, message)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
     }
-
-    private enum class ExtraSound { NONE, NEW_ITEM, BEEP }
 }
 
 object Health {

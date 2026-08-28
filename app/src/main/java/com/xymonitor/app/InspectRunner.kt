@@ -123,7 +123,7 @@ object InspectRunner {
             prefs.lastError = outcome.error.orEmpty()
             prefs.lastStatus = "巡检失败"
             DebugLog.i("巡检失败 ${outcome.error} 耗时=${Interval.formatSeconds(cost)}s")
-            ChangeAlert.fireError(app, outcome.error.orEmpty(), prefs.errorSound)
+            ChangeAlert.fireError(app, outcome.error.orEmpty())
         }
     }
 

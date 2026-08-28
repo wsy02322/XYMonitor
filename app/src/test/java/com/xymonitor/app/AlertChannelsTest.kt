@@ -19,4 +19,9 @@ class AlertChannelsTest {
         assertNotEquals(a, b)
         assertEquals(a, AlertChannels.alertChannelId("content://media/internal/audio/media/1"))
     }
+
+    @Test
+    fun errorChannelIsSilentId() {
+        assertEquals("monitor_error_mute", AlertChannels.ERROR)
+    }
 }

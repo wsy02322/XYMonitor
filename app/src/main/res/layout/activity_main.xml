@@ -104,18 +104,10 @@
                 android:text="@string/reset_sound" />
         </LinearLayout>
 
-        <CheckBox
-            android:id="@+id/errorSound"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:checked="true"
-            android:text="@string/error_sound"
-            android:textColor="@color/text" />
-
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
             android:text="@string/error_hint"
             android:textColor="@color/muted"
             android:textSize="13sp" />

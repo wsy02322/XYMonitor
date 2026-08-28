@@ -21,13 +21,12 @@
     <string name="sound_value">上新提示音：%1$s</string>
     <string name="sound_default">默认</string>
     <string name="sound_custom">已选择</string>
-    <string name="error_sound">出错时发声（滴一声）</string>
-    <string name="error_hint">出错会循环震动并走闹钟通知，直到你点掉；发声可关。</string>
+    <string name="error_hint">巡检失败只循环震动并出通知，不放提示音。第一件变化才会响你选的音乐。</string>
     <string name="interval_label">巡检间隔（秒）最短 A ～ 最长 B</string>
     <string name="interval_a_hint">最短秒数</string>
     <string name="interval_b_hint">最长秒数</string>
     <string name="interval_hint">每次在 A～B 之间按毫秒随机等待，避免固定节奏被识别。过短更容易触发风控，建议 ≥ 60 秒，系统下限 30 秒。</string>
     <string name="probe">试一次提醒（不改已记 ID）</string>
     <string name="copy_log">复制调试日志</string>
-    <string name="tips">第一件变化或巡检失败都会循环震动，直到你点通知、点弹窗确定、点状态栏。系统状态栏可能显示下次巡检为闹钟，这是为了准时唤醒。下方是调试日志；先点「试一次提醒」确认本机震动和声音。</string>
+    <string name="tips">第一件变化会循环震动并放提示音；巡检失败只震动。点通知、弹窗确定或状态栏可停震。系统状态栏可能显示下次巡检为闹钟。下方是调试日志；先点「试一次提醒」确认上新的震动和声音。</string>
 </resources>
