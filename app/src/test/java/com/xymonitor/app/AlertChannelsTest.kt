@@ -22,6 +22,6 @@ class AlertChannelsTest {
 
     @Test
     fun errorChannelIsSilentId() {
-        assertEquals("monitor_error_mute", AlertChannels.ERROR)
+        assertEquals("monitor_error_mute", AlertChannels.ERROR_MUTE)
     }
 }

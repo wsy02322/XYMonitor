@@ -26,7 +26,7 @@ object ChangeAlert {
             message = message.ifBlank { "未知错误" },
             reason = "出错",
             playSound = false,
-            channelId = AlertChannels.ERROR,
+            channelId = AlertChannels.ERROR_MUTE,
             notifyId = 2,
         )
     }

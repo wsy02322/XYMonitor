@@ -35,10 +35,6 @@ class Prefs(context: Context) {
         get() = Interval.clampSeconds(sp.getInt(KEY_INTERVAL_B, Interval.DEFAULT_B))
         set(value) = sp.edit().putInt(KEY_INTERVAL_B, Interval.clampSeconds(value)).apply()
 
-    var errorSound: Boolean
-        get() = sp.getBoolean(KEY_ERROR_SOUND, true)
-        set(value) = sp.edit().putBoolean(KEY_ERROR_SOUND, value).apply()
-
     var newItemSoundUri: String
         get() = sp.getString(KEY_NEW_ITEM_SOUND, "").orEmpty()
         set(value) = sp.edit().putString(KEY_NEW_ITEM_SOUND, value).apply()
@@ -88,7 +84,6 @@ class Prefs(context: Context) {
         private const val KEY_KNOWN_USER = "known_user"
         private const val KEY_INTERVAL_A = "interval_a"
         private const val KEY_INTERVAL_B = "interval_b"
-        private const val KEY_ERROR_SOUND = "error_sound"
         private const val KEY_NEW_ITEM_SOUND = "new_item_sound"
         private const val KEY_NEXT_WAIT = "next_wait"
         private const val KEY_PLANNED_WAIT = "planned_wait"

@@ -77,6 +77,7 @@ object InspectRunner {
         val previousCheck = prefs.lastCheckAt
         val planned = prefs.lastPlannedWaitMs
         val outcome = try {
+            NetworkWait.awaitValidated(app)
             val currentFirstId = client.fetchFirstCardId(prefs.userId)
             Inspector.compare(previousId, currentFirstId)
         } catch (_: InterruptedException) {

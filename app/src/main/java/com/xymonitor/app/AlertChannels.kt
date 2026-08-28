@@ -10,7 +10,7 @@ import android.os.Build
 
 object AlertChannels {
     const val RUNNING = "monitor"
-    const val ERROR = "monitor_error_mute"
+    const val ERROR_MUTE = "monitor_error_mute"
     const val ALERT_PREFIX = "monitor_alarm_"
 
     fun alertChannelId(soundUri: String): String {
@@ -78,9 +78,9 @@ object AlertChannels {
     }
 
     private fun ensureError(context: Context, manager: NotificationManager) {
-        if (manager.getNotificationChannel(ERROR) != null) return
+        if (manager.getNotificationChannel(ERROR_MUTE) != null) return
         val error = NotificationChannel(
-            ERROR,
+            ERROR_MUTE,
             context.getString(R.string.notify_error_channel),
             NotificationManager.IMPORTANCE_HIGH,
         )

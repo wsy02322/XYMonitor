@@ -28,9 +28,9 @@ class InspectPlanTest {
     }
 
     @Test
-    fun watchdogIsShortAndAfterConnectTimeout() {
-        assertEquals(12_000L, InspectPlan.WATCHDOG_MS)
-        assertTrue(InspectPlan.WATCHDOG_MS > XianyuClient.CONNECT_TIMEOUT_MS)
-        assertTrue(InspectPlan.WATCHDOG_MS < 30_000L)
+    fun watchdogCoversWarmupAndRetries() {
+        assertEquals(30_000L, InspectPlan.WATCHDOG_MS)
+        assertTrue(InspectPlan.WATCHDOG_MS > XianyuClient.CONNECT_TIMEOUT_MS * 3)
+        assertTrue(InspectPlan.WATCHDOG_MS >= NetworkWait.MAX_WAIT_MS + XianyuClient.DNS_BACKOFF_MS)
     }
 }
