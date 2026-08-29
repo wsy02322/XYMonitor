@@ -5,6 +5,8 @@ import android.content.Intent
 import android.net.wifi.WifiManager
 import android.os.PowerManager
 
+class SkipRound(message: String) : Exception(message)
+
 object InspectRunner {
     private val lock = Any()
     private val clients = HashMap<String, VpsClient>()
@@ -94,6 +96,17 @@ object InspectRunner {
         } catch (_: InterruptedException) {
             DebugLog.i("问服务器中断")
             return
+        } catch (e: SkipRound) {
+            val now = System.currentTimeMillis()
+            prefs.lastCheckAt = now
+            prefs.lastError = ""
+            prefs.lastStatus = "本轮无网已跳过"
+            prefs.lastActualGapMs = if (previousCheck > 0) now - previousCheck else 0L
+            DebugLog.i(
+                "本轮跳过 ${e.message} 耗时=${Interval.formatSeconds(now - started)}s " +
+                    "距上次=${Interval.formatSeconds(prefs.lastActualGapMs)}s",
+            )
+            return
         } catch (e: Exception) {
             prefs.lastCheckAt = System.currentTimeMillis()
             prefs.lastError = e.message ?: e.javaClass.simpleName
@@ -153,14 +166,21 @@ object InspectRunner {
             throw IllegalStateException("请填写服务器密钥")
         }
         val status = NetworkWait.awaitValidated(app)
+        val overseasIp = runCatching { VpsClient.parseEndpoint(prefs.vpsUrl).literalIpv4 }.getOrDefault(false)
         if (status == NetworkWait.NONE) {
-            DebugLog.i("无WiFi网络，直接走流量")
+            if (overseasIp) {
+                throw SkipRound("无WiFi，不走流量打海外IP")
+            }
+            DebugLog.i("无WiFi网络，改走流量")
             return fetchViaCellular(app, prefs)
         }
         return try {
             callStart(prefs)
         } catch (e: Exception) {
-            if (e is InterruptedException || !VpsClient.isRetryable(e)) throw e
+            if (e is InterruptedException || e is SkipRound || !VpsClient.isRetryable(e)) throw e
+            if (overseasIp) {
+                throw SkipRound("默认网络失败，不走流量打海外IP")
+            }
             DebugLog.i("默认网络失败，改走流量 ${e.message}")
             fetchViaCellular(app, prefs)
         }

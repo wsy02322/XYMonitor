@@ -54,6 +54,8 @@ data class VpsEndpoint(
     val host: String,
     val port: Int,
 ) {
+    val literalIpv4: Boolean =
+        host.matches(Regex("""^\d{1,3}(?:\.\d{1,3}){3}$"""))
     fun display(): String {
         val defaultPort = if (protocol == "https") 443 else 80
         return if (port == defaultPort) "$protocol://$host" else "$protocol://$host:$port"

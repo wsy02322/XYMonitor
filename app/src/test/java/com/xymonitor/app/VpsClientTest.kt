@@ -21,6 +21,14 @@ class VpsClientTest {
     }
 
     @Test
+    fun literalIpv4SkipsCellularHeuristic() {
+        assertTrue(VpsClient.parseEndpoint("http://78.47.152.85").literalIpv4)
+        assertTrue(VpsClient.parseEndpoint("78.47.152.85:80").literalIpv4)
+        assertFalse(VpsClient.parseEndpoint("https://micropigeon.com").literalIpv4)
+        assertFalse(VpsClient.parseEndpoint("https://xy.example.com").literalIpv4)
+    }
+
+    @Test
     fun parseBareHostPortAddsHttp() {
         val endpoint = VpsClient.parseEndpoint("78.47.152.85:18787")
         assertEquals("http://78.47.152.85:18787", endpoint.display())
