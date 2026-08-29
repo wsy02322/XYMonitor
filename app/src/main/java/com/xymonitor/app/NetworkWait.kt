@@ -23,7 +23,7 @@ object Ipv4 {
 }
 
 object NetworkWait {
-    const val MAX_WAIT_MS = 2_500L
+    const val MAX_WAIT_MS = 10_000L
     const val POLL_MS = 250L
     const val NONE = "无网络"
 
@@ -34,7 +34,7 @@ object NetworkWait {
         while (true) {
             val elapsed = SystemClock.elapsedRealtime() - start
             last = snapshot(cm)
-            if (last == "已验证") {
+            if (last.startsWith("已验证")) {
                 DebugLog.i("网络就绪 状态=$last 等待=${Interval.formatSeconds(elapsed)}s")
                 return last
             }
@@ -52,15 +52,24 @@ object NetworkWait {
         }
     }
 
+    fun canUseDefault(status: String): Boolean {
+        return status.startsWith("已验证") || status.startsWith("有网未验证")
+    }
+
     private fun snapshot(cm: ConnectivityManager): String {
         val net = cm.activeNetwork ?: return NONE
         val caps = cm.getNetworkCapabilities(net) ?: return "无能力"
         val validated = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
         val internet = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        val via = when {
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "WiFi"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "流量"
+            else -> "其他"
+        }
         return when {
-            validated -> "已验证"
-            internet -> "有网未验证"
-            else -> "无INTERNET"
+            validated -> "已验证/$via"
+            internet -> "有网未验证/$via"
+            else -> "无INTERNET/$via"
         }
     }
 }

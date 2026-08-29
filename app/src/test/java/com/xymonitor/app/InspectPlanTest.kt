@@ -32,6 +32,9 @@ class InspectPlanTest {
         assertEquals(45_000L, InspectPlan.WATCHDOG_MS)
         assertTrue(InspectPlan.WATCHDOG_MS > CellularFallback.REQUEST_MS)
         assertTrue(InspectPlan.WATCHDOG_MS > XianyuClient.CONNECT_TIMEOUT_MS * 3)
-        assertTrue(InspectPlan.WATCHDOG_MS >= NetworkWait.MAX_WAIT_MS + XianyuClient.DNS_BACKOFF_MS)
+        assertTrue(InspectPlan.WATCHDOG_MS >= NetworkWait.MAX_WAIT_MS + VpsClient.CONNECT_TIMEOUT_MS * 3)
+        assertTrue(NetworkWait.canUseDefault("已验证/流量"))
+        assertTrue(NetworkWait.canUseDefault("有网未验证/WiFi"))
+        assertFalse(NetworkWait.canUseDefault("无网络"))
     }
 }

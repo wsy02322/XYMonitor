@@ -166,31 +166,14 @@ object InspectRunner {
             throw IllegalStateException("请填写服务器密钥")
         }
         val status = NetworkWait.awaitValidated(app)
-        val overseasIp = runCatching { VpsClient.parseEndpoint(prefs.vpsUrl).literalIpv4 }.getOrDefault(false)
-        if (status == NetworkWait.NONE) {
-            if (overseasIp) {
-                throw SkipRound("无WiFi，不走流量打海外IP")
-            }
-            DebugLog.i("无WiFi网络，改走流量")
-            return fetchViaCellular(app, prefs)
+        if (!NetworkWait.canUseDefault(status)) {
+            throw SkipRound("无可用默认网络")
         }
         return try {
             callStart(prefs)
         } catch (e: Exception) {
             if (e is InterruptedException || e is SkipRound || !VpsClient.isRetryable(e)) throw e
-            if (overseasIp) {
-                throw SkipRound("默认网络失败，不走流量打海外IP")
-            }
-            DebugLog.i("默认网络失败，改走流量 ${e.message}")
-            fetchViaCellular(app, prefs)
-        }
-    }
-
-    private fun fetchViaCellular(app: Context, prefs: Prefs): VpsSnapshot {
-        val session = CellularFallback.acquire(app)
-            ?: throw IllegalStateException("申请流量网络失败")
-        session.use {
-            return callStart(prefs, it.network)
+            throw SkipRound("默认网络失败 ${e.message}")
         }
     }
 
