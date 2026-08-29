@@ -3,7 +3,7 @@
     <string name="app_name">闲鱼上新监控</string>
     <string name="subtitle">服务器打闲鱼，手机只问服务器是否上新</string>
     <string name="vps_url_label">服务器地址</string>
-    <string name="vps_url_hint">例如 http://1.2.3.4:8787</string>
+    <string name="vps_url_hint">安装结束打印的地址，可只填 IP:端口</string>
     <string name="vps_token_label">服务器密钥</string>
     <string name="vps_token_hint">和 VPS 上的 XY_TOKEN 相同</string>
     <string name="user_id_label">卖家 userId</string>

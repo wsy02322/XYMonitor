@@ -7,8 +7,28 @@ import org.junit.Test
 
 class VpsClientTest {
     @Test
-    fun joinTrimsSlash() {
-        assertEquals("http://1.2.3.4:8787/pending", VpsClient.join("http://1.2.3.4:8787/", "/pending"))
+    fun parseIpv4AndPortDoesNotTreatAddressAsIpv6() {
+        val endpoint = VpsClient.parseEndpoint("http://78.47.152.85:18787")
+        assertEquals("http", endpoint.protocol)
+        assertEquals("78.47.152.85", endpoint.host)
+        assertEquals(18787, endpoint.port)
+        assertEquals("http://78.47.152.85:18787", endpoint.display())
+        val url = endpoint.url("/start")
+        assertEquals("http", url.protocol)
+        assertEquals("78.47.152.85", url.host)
+        assertEquals(18787, url.port)
+        assertEquals("/start", url.path)
+    }
+
+    @Test
+    fun parseBareHostPortAddsHttp() {
+        val endpoint = VpsClient.parseEndpoint("78.47.152.85:18787")
+        assertEquals("http://78.47.152.85:18787", endpoint.display())
+    }
+
+    @Test
+    fun joinUsesParsedEndpoint() {
+        assertEquals("http://78.47.152.85:18787/pending", VpsClient.join("http://78.47.152.85:18787/", "/pending"))
         assertEquals("https://example.com/start", VpsClient.join("https://example.com", "start"))
     }
 

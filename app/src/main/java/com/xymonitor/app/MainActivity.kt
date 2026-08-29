@@ -152,8 +152,10 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val vpsUrl = vpsUrlInput.text.toString().trim()
-        if (!vpsUrl.startsWith("http://") && !vpsUrl.startsWith("https://")) {
-            Toast.makeText(this, "请填写服务器地址，以 http:// 或 https:// 开头", Toast.LENGTH_SHORT).show()
+        val endpoint = try {
+            VpsClient.parseEndpoint(vpsUrl)
+        } catch (e: Exception) {
+            Toast.makeText(this, e.message ?: "服务器地址不对", Toast.LENGTH_SHORT).show()
             return
         }
         val vpsToken = vpsTokenInput.text.toString().trim()
@@ -162,7 +164,8 @@ class MainActivity : AppCompatActivity() {
             return
         }
         prefs.userId = userId
-        prefs.vpsUrl = vpsUrl
+        prefs.vpsUrl = endpoint.display()
+        vpsUrlInput.setText(prefs.vpsUrl)
         prefs.vpsToken = vpsToken
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
@@ -189,7 +192,8 @@ class MainActivity : AppCompatActivity() {
         val b = intervalBInput.text.toString().trim().toIntOrNull() ?: return false
         prefs.intervalA = a
         prefs.intervalB = b
-        prefs.vpsUrl = vpsUrlInput.text.toString().trim()
+        val typedUrl = vpsUrlInput.text.toString().trim()
+        prefs.vpsUrl = runCatching { VpsClient.parseEndpoint(typedUrl).display() }.getOrDefault(typedUrl)
         prefs.vpsToken = vpsTokenInput.text.toString().trim()
         if (!intervalAInput.hasFocus()) intervalAInput.setText(prefs.intervalA.toString())
         if (!intervalBInput.hasFocus()) intervalBInput.setText(prefs.intervalB.toString())

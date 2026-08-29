@@ -49,6 +49,22 @@ data class VpsSnapshot(
     }
 }
 
+data class VpsEndpoint(
+    val protocol: String,
+    val host: String,
+    val port: Int,
+) {
+    fun display(): String {
+        val defaultPort = if (protocol == "https") 443 else 80
+        return if (port == defaultPort) "$protocol://$host" else "$protocol://$host:$port"
+    }
+
+    fun url(path: String): URL {
+        val file = if (path.startsWith("/")) path else "/$path"
+        return URL(protocol, host, port, file)
+    }
+}
+
 class VpsClient(
     private val baseUrl: String,
     private val token: String,
@@ -123,7 +139,9 @@ class VpsClient(
     }
 
     private fun call(method: String, path: String, body: String?): String {
-        val url = URL(join(baseUrl, path))
+        val endpoint = parseEndpoint(baseUrl)
+        val url = endpoint.url(path)
+        DebugLog.i("$method ${endpoint.display()}$path")
         val conn = open(url)
         current.set(conn)
         try {
@@ -176,10 +194,50 @@ class VpsClient(
         const val MAX_ATTEMPTS = 3
         const val CONNECT_RETRY_MS = 400L
 
+        fun parseEndpoint(raw: String): VpsEndpoint {
+            var text = raw.trim()
+                .replace('\u3000', ' ')
+                .replace('：', ':')
+                .trim('"', '\'', ' ', '\n', '\r', '\t')
+            if (text.startsWith("地址")) {
+                text = text.removePrefix("地址").trim(' ', ':', '：')
+            }
+            if (!text.startsWith("http://", ignoreCase = true) &&
+                !text.startsWith("https://", ignoreCase = true)
+            ) {
+                text = "http://$text"
+            }
+            val protocol = if (text.startsWith("https://", ignoreCase = true)) "https" else "http"
+            var rest = text.substringAfter("://").substringBefore('#').substringBefore('?').trimEnd('/')
+            rest = rest.substringBefore('/')
+            if (rest.isBlank()) {
+                throw IllegalStateException("服务器地址缺少主机")
+            }
+            val colon = rest.lastIndexOf(':')
+            val host: String
+            val port: Int
+            if (colon > 0 && rest.indexOf(']') < 0) {
+                host = rest.substring(0, colon).trim()
+                val portText = rest.substring(colon + 1).trim()
+                port = portText.toIntOrNull()
+                    ?: throw IllegalStateException("端口不是数字：$portText")
+            } else {
+                host = rest.trim()
+                port = if (protocol == "https") 443 else 80
+            }
+            if (host.isBlank() || host.contains(' ')) {
+                throw IllegalStateException("服务器主机不对")
+            }
+            if (port !in 1..65535) {
+                throw IllegalStateException("端口超出范围：$port")
+            }
+            return VpsEndpoint(protocol, host, port)
+        }
+
         fun join(base: String, path: String): String {
-            val trimmed = base.trim().trimEnd('/')
+            val endpoint = parseEndpoint(base)
             val suffix = path.trim().let { if (it.startsWith("/")) it else "/$it" }
-            return trimmed + suffix
+            return endpoint.display() + suffix
         }
 
         fun isRetryable(error: Throwable): Boolean {
