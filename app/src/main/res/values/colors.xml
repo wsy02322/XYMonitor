@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#FFF7F2EC</color>
+    <color name="text">#FF1F1A16</color>
+    <color name="muted">#FF7A6F67</color>
+    <color name="input">#FFFFFFFF</color>
+    <color name="status">#FFFFFDFB</color>
+    <color name="stroke">#E6D9CFC6</color>
+    <color name="primary">#FFC45C26</color>
+    <color name="stop">#FF8A4A3B</color>
+    <color name="muted_btn">#FF6E655E</color>
+    <color name="notify">#FFC45C26</color>
+</resources>
